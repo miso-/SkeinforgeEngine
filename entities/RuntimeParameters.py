@@ -53,10 +53,6 @@ class RuntimeParameters:
         self.supportFeedRate = config.getfloat('speed', 'feed.rate.support')
         
         self.dimensionActive = config.getboolean('dimension', 'active')
-        self.filamentDiameter = config.getfloat('dimension', 'filament.diameter')
-        self.filamentPackingDensity = config.getfloat('dimension', 'filament.packing.density')
-        self.oozeRate = config.getfloat('dimension', 'oozerate')
-        self.extruderRetractionSpeed = config.getfloat('dimension', 'extruder.retraction.speed')
         self.extrusionUnitsRelative = config.getboolean('dimension', 'extrusion.units.relative')
         self.dimensionDecimalPlaces = config.getint('dimension', 'decimal.places')
         
@@ -88,3 +84,4 @@ class RuntimeParameters:
         self.orbitalFeedRateMinute = self.orbitalFeedRateSecond * 60
         
         self.combActive = config.getboolean('comb', 'active')
+        

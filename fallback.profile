@@ -118,10 +118,6 @@ interface.layer.thickness.ratio=1.0
 
 [dimension]
 active=true
-filament.diameter=2.8
-filament.packing.density=1.0
-oozerate=75.0
-extruder.retraction.speed=15.0
 extrusion.units.relative=false
 decimal.places=4
 
@@ -140,3 +136,13 @@ cool.end.file=cool_end.gmc
 strategy.path=plugins/strategies
 strategy=SlowDownCoolStrategy
 orbital.margin=10.0
+
+[Extruder0]
+
+name=Default Extruder
+filament.diameter=2.8
+filament.packing.density=1.0
+oozerate=75.0
+retraction.speed=15.0
+maximum.retraction=20
+axis.code=E

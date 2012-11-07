@@ -43,25 +43,16 @@ class Path:
         
         self.dimensionActive = runtimeParameters.dimensionActive
         
-        self.oozeRate = runtimeParameters.oozeRate
         self.zDistanceRatio = 5.0
-        self.extruderRetractionSpeedMinute = round(60.0 * runtimeParameters.extruderRetractionSpeed, self.dimensionDecimalPlaces)
-
+        
         self.layerThickness = runtimeParameters.layerThickness
         self.perimeterWidth = runtimeParameters.perimeterWidth
-        self.filamentDiameter = runtimeParameters.filamentDiameter
-        self.filamentPackingDensity = runtimeParameters.filamentPackingDensity
         self.absolutePositioning = config.getboolean('preface', 'positioning.absolute')
         self.flowRate = runtimeParameters.flowRate
         self.perimeterFlowRate = runtimeParameters.perimeterFlowRate
         self.bridgeFlowRate = runtimeParameters.bridgeFlowRate
         self.combActive = runtimeParameters.combActive
-        filamentRadius = 0.5 * self.filamentDiameter
-        filamentPackingArea = pi * filamentRadius * filamentRadius * self.filamentPackingDensity
-        extrusionArea = pi * self.layerThickness ** 2 / 4 + self.layerThickness * (self.perimeterWidth - self.layerThickness)
-            #http://hydraraptor.blogspot.sk/2011/03/spot-on-flow-rate.html
-        self.flowScaleSixty = 60.0 * extrusionArea / filamentPackingArea
-        
+                
         self.minimumBridgeFeedRateMultiplier = runtimeParameters.minimumBridgeFeedRateMultiplier
         self.minimumPerimeterFeedRateMultiplier = runtimeParameters.minimumPerimeterFeedRateMultiplier
         self.minimumExtrusionFeedRateMultiplier = runtimeParameters.minimumExtrusionFeedRateMultiplier
@@ -115,7 +106,7 @@ class Path:
         '''Allows subclasses to override the relevant flowrate method so we don't have to use large if statements.'''
         return self.flowRate
 
-    def generateGcode(self, lookaheadStartVector=None, feedAndFlowRateMultiplier=[1.0, 1.0], runtimeParameters=None):
+    def generateGcode(self, extruder, lookaheadStartVector=None, feedAndFlowRateMultiplier=[1.0, 1.0], runtimeParameters=None):
         'Transforms paths and points to gcode'
         global _previousPoint
         self.gcodeCommands = []
@@ -141,8 +132,12 @@ class Path:
                 gcodeArgs.append(('F', pathFeedRateMinute))
                 
             if self.dimensionActive:
-                extrusionDistance = self.getExtrusionDistance(point, flowRate * feedAndFlowRateMultiplier[1], pathFeedRateMinute)
-                gcodeArgs.append(('E', '%s' % extrusionDistance))
+                if self.absolutePositioning:
+                        distance = abs(point - _previousPoint)
+                        _previousPoint = point
+                                                                
+                extrusionDistance = extruder.getExtrusionDistance(distance, flowRate * feedAndFlowRateMultiplier[1], pathFeedRateMinute)
+                gcodeArgs.append(('%s' % extruder.axisCode, '%s' % extrusionDistance))
                 
             self.gcodeCommands.append(
                 GcodeCommand(gcodes.LINEAR_GCODE_MOVEMENT, gcodeArgs))
@@ -153,39 +148,7 @@ class Path:
             return (self.minimumLayerFeedRateMinute, self.minimumLayerFeedRateMinute / feedRateMinute)
         else:
             return (feedRateMinute * feedRateMultiplier, feedRateMultiplier)
-    
-    def getResetExtruderDistanceCommand(self):
-        global _totalExtrusionDistance
-        _totalExtrusionDistance = 0.0
-        return GcodeCommand(gcodes.RESET_EXTRUDER_DISTANCE, [('E', '0')])
         
-
-    def getExtrusionDistance(self, point, flowRate, feedRateMinute):
-        global _totalExtrusionDistance
-        global _previousPoint
-        distance = 0.0        
-        
-        if self.absolutePositioning:
-            if _previousPoint != None:
-                distance = abs(point - _previousPoint)
-            _previousPoint = point
-        else:
-            if _previousPoint == None:
-                logger.warning('There was no absolute location when the G91 command was parsed, so the absolute location will be set to the origin.')
-                _previousPoint = Vector3()
-            distance = abs(point)
-            _previousPoint += point            
-        
-        scaledFlowRate = flowRate * self.flowScaleSixty
-        extrusionDistance = scaledFlowRate / feedRateMinute * distance
-        
-        if self.extrusionUnitsRelative:
-            extrusionDistance = round(extrusionDistance, self.dimensionDecimalPlaces)
-        else:
-            _totalExtrusionDistance += extrusionDistance
-            extrusionDistance = round(_totalExtrusionDistance, self.dimensionDecimalPlaces)
-            
-        return extrusionDistance
 
     def offset(self, offset):
         if self.startPoint != None:
@@ -278,9 +241,8 @@ class TravelPath(Path):
                 
             self.gcodeCommands.append(GcodeCommand(gcodes.LINEAR_GCODE_MOVEMENT, gcodeArgs))
                         
-    def generateGcode(self, lookaheadStartVector=None, feedAndFlowRateMultiplier=[1.0, 1.0], runtimeParameters=None):
+    def generateGcode(self, pathExtruder, lookaheadStartVector=None, feedAndFlowRateMultiplier=[1.0, 1.0], runtimeParameters=None):
         'Transforms paths and points to gcode'
-        lastRetractionExtrusionDistance = 0.0
         global _previousPoint
         
         if runtimeParameters != None:
@@ -298,14 +260,11 @@ class TravelPath(Path):
                 xyTravel = abs(locationMinusOld.dropAxis())
                 zTravelMultiplied = locationMinusOld.z * self.zDistanceRatio
                 timeToNextThread = math.sqrt(xyTravel * xyTravel + zTravelMultiplied * zTravelMultiplied) / self.extrusionFeedRateMinute * 60
-                retractionExtrusionDistance = timeToNextThread * abs(self.oozeRate) / 60
             else:
-                retractionExtrusionDistance = 0.0
+                timeToNextThread = 0.0
             
-            self.gcodeCommands.extend(self.getRetractCommands(retractionExtrusionDistance, self.getFeedRateMinute()))
+            self.gcodeCommands.extend(pathExtruder.getRetractCommands(timeToNextThread, self.getFeedRateMinute()))
             
-            #Store for reverse retraction
-            lastRetractionExtrusionDistance = retractionExtrusionDistance
             
         self.gcodeCommands.append(GcodeCommand(gcodes.TURN_EXTRUDER_OFF))
         
@@ -313,40 +272,10 @@ class TravelPath(Path):
     
         if self.dimensionActive:
             #_previousPoint = self.startPoint            
-            self.gcodeCommands.extend(self.getRetractReverseCommands(lastRetractionExtrusionDistance))
+            self.gcodeCommands.extend(pathExtruder.getRetractReverseCommands())
             
         self.gcodeCommands.append(GcodeCommand(gcodes.TURN_EXTRUDER_ON))        
-        
-    def getRetractCommands(self, extrusionDistance, resumingSpeed):
-        global _totalExtrusionDistance
-        commands = []
-        if self.extrusionUnitsRelative:
-            retractDistance = round(-extrusionDistance, self.dimensionDecimalPlaces)
-        else:
-            _totalExtrusionDistance -= extrusionDistance
-            retractDistance = round(_totalExtrusionDistance, self.dimensionDecimalPlaces)
-    
-        commands.append(GcodeCommand(gcodes.LINEAR_GCODE_MOVEMENT, [('F', '%s' % self.extruderRetractionSpeedMinute)]))
-        commands.append(GcodeCommand(gcodes.LINEAR_GCODE_MOVEMENT, [('E', '%s' % retractDistance)]))
-        commands.append(GcodeCommand(gcodes.LINEAR_GCODE_MOVEMENT, [('F', '%s' % resumingSpeed)]))
-        return commands
-    
-    def getRetractReverseCommands(self, extrusionDistance):
-        global _totalExtrusionDistance
-        commands = []
-        if self.extrusionUnitsRelative:
-            retractDistance = round(extrusionDistance, self.dimensionDecimalPlaces)
-        else:
-            _totalExtrusionDistance += extrusionDistance
-            retractDistance = round(_totalExtrusionDistance, self.dimensionDecimalPlaces)
-    
-        commands.append(GcodeCommand(gcodes.LINEAR_GCODE_MOVEMENT, [('F', '%s' % self.extruderRetractionSpeedMinute)]))
-        commands.append(GcodeCommand(gcodes.LINEAR_GCODE_MOVEMENT, [('E', '%s' % retractDistance)]))
-        commands.append(GcodeCommand(gcodes.LINEAR_GCODE_MOVEMENT, [('F', '%s' % self.travelFeedRateMinute)]))
-                        
-        if not self.extrusionUnitsRelative:
-            commands.append(self.getResetExtruderDistanceCommand())
-        return commands        
+               
     
     def getFeedRateMinute(self):
         return self.travelFeedRateMinute

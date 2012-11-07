@@ -37,26 +37,16 @@ class NestedRing:
         self.perimeterFeedRateMinute = self.runtimeParameters.perimeterFeedRateMinute
         self.extrusionFeedRateMinute = self.runtimeParameters.extrusionFeedRateMinute
         self.travelFeedRateMinute = self.runtimeParameters.travelFeedRateMinute
-        self.extrusionUnitsRelative = self.runtimeParameters.extrusionUnitsRelative
         
-        self.oozeRate = self.runtimeParameters.oozeRate
         self.zDistanceRatio = 5.0
-        self.extruderRetractionSpeedMinute = round(60.0 * self.runtimeParameters.extruderRetractionSpeed, self.decimalPlaces)
-
+        
         self.layerThickness = self.runtimeParameters.layerThickness
         self.perimeterWidth = self.runtimeParameters.perimeterWidth
-        self.filamentDiameter = self.runtimeParameters.filamentDiameter
-        self.filamentPackingDensity = self.runtimeParameters.filamentPackingDensity
         self.absolutePositioning = config.getboolean('preface', 'positioning.absolute')
         self.flowRate = self.runtimeParameters.flowRate
         self.perimeterFlowRate = self.runtimeParameters.perimeterFlowRate
         self.bridgeFlowRate = self.runtimeParameters.bridgeFlowRate
         self.previousPoint = None
-        filamentRadius = 0.5 * self.filamentDiameter
-        filamentPackingArea = pi * filamentRadius * filamentRadius * self.filamentPackingDensity
-        extrusionArea = pi * self.layerThickness ** 2 / 4 + self.layerThickness * (self.perimeterWidth - self.layerThickness)
-            #http://hydraraptor.blogspot.sk/2011/03/spot-on-flow-rate.html
-        self.flowScaleSixty = 60.0 * extrusionArea / filamentPackingArea
         
     def __str__(self):
         output = StringIO()

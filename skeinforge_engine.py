@@ -9,6 +9,7 @@ from entities import SlicedModel, RuntimeParameters
 from fabmetheus_utilities import archive
 from importlib import import_module
 from utilities import memory_tracker
+from entities.Extruder import setupExtruders
 import StringIO
 import argparse
 import logging
@@ -111,6 +112,8 @@ def main(argv=None):
     
     slicedModel.runtimeParameters.profileName = profileName
     slicedModel.runtimeParameters.inputFilename = inputFilename
+    
+    setupExtruders(slicedModel)
     
     getCraftedTextFromPlugins(pluginSequence[:], slicedModel)
     

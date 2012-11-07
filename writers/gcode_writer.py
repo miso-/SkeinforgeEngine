@@ -82,7 +82,9 @@ class GcodeWriter:
             
     def getPath(self, path, output, lookaheadStartVector=None, feedAndFlowRateMultiplier=[1.0, 1.0], verbose=False):
         '''Final Gcode representation.'''
-        path.generateGcode(lookaheadStartVector, feedAndFlowRateMultiplier, self.slicedModel.runtimeParameters)
+        pathExtruder = self.slicedModel.runtimeParameters.extruders[0]
+        
+        path.generateGcode(pathExtruder, lookaheadStartVector, feedAndFlowRateMultiplier, self.slicedModel.runtimeParameters)
             
         for command in path.gcodeCommands:
             output.write('%s' % printCommand(command, verbose))
