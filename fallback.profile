@@ -115,6 +115,8 @@ support.start.file=support_start.gmc
 infill.overhang.ratio=3.0
 interface.infill.density=0.25
 interface.layer.thickness.ratio=1.0
+strategy.path=plugins/strategies
+strategy=DefaultSupportStrategy
 
 [dimension]
 active=true
