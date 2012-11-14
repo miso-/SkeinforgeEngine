@@ -35,6 +35,7 @@ class PrefaceSkein:
 		self.resetExtruder = config.getboolean(name, 'startup.extruder.reset')
 		self.endFile = config.get(name, 'end.file')
 		self.startFile = config.get(name, 'start.file')
+		self.layerHeight = self.slicedModel.runtimeParameters.layerHeight
 		
 	def preface(self):
 		"Prefaces and converts the svg text to Gcode."
@@ -49,7 +50,9 @@ class PrefaceSkein:
 	
 	def addPrefaceToGcode(self, index, rotatedLoopLayer):
 		decimalPlaces = self.slicedModel.runtimeParameters.decimalPlaces
-		z = round(rotatedLoopLayer.z, 3)
+		
+		# adding 0.5*layerHeight is needed to get layer[0].z == layerHeight
+		z = round(rotatedLoopLayer.z + (self.layerHeight * 0.5), 3)
 		layer = Layer(z, index, self.slicedModel.runtimeParameters)		
 		
 		if rotatedLoopLayer.rotation != None:
