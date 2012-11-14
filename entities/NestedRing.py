@@ -11,7 +11,7 @@ import time
 
 
 class NestedRing:
-    def __init__(self, z, runtimeParameters):
+    def __init__(self, runtimeParameters, z = 0):
        
         if runtimeParameters.profileMemory:
             memory_tracker.track_object(self)
@@ -155,10 +155,10 @@ class NestedRing:
             
                         
     def setBoundaryPerimeter(self, boundaryPointsLoop, perimeterLoop=None):        
-        self.perimeter = BoundaryPerimeter(self.z, self.runtimeParameters)
+        self.perimeter = BoundaryPerimeter(self.runtimeParameters)
         
         for point in boundaryPointsLoop:
-            self.perimeter.boundaryPoints.append(Vector3(point.real, point.imag, self.z))
+            self.perimeter.boundaryPoints.append(Vector3(point.real, point.imag, 0))
             
         if len(boundaryPointsLoop) < 2:
             return
@@ -177,7 +177,7 @@ class NestedRing:
     def addInfillGcodeFromThread(self, thread):
         'Add a thread to the output.'
         
-        infillPath = InfillPath(self.z, self.runtimeParameters)
+        infillPath = InfillPath(self.runtimeParameters)
         decimalPlaces = self.decimalPlaces
         if len(thread) > 0:
             infillPath.startPoint = thread[0]
@@ -260,7 +260,7 @@ class NestedRing:
     def addPerimeterInner(self, extrusionHalfWidth, oldOrderedLocation, threadSequence):
         'Add to the perimeter and the inner island.'
         for loop in self.extraLoops:
-            innerPerimeterLoop = Loop(self.z, self.runtimeParameters)
+            innerPerimeterLoop = Loop(self.runtimeParameters)
             if euclidean.isWiddershins(loop + [loop[0]]):
                 innerPerimeterLoop.type = 'outer'
             else:

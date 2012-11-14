@@ -19,7 +19,7 @@ def resetExtrusionStats():
     
 class Path:
     ''' A Path the tool will follow within a nested ring.'''
-    def __init__(self, z, runtimeParameters):
+    def __init__(self, runtimeParameters, z=0):
         
         self.z = z
         
@@ -106,7 +106,7 @@ class Path:
         '''Allows subclasses to override the relevant flowrate method so we don't have to use large if statements.'''
         return self.flowRate
 
-    def generateGcode(self, extruder, lookaheadStartVector=None, feedAndFlowRateMultiplier=[1.0, 1.0], runtimeParameters=None):
+    def generateGcode(self, extruder, height, lookaheadStartVector=None, feedAndFlowRateMultiplier=[1.0, 1.0], runtimeParameters=None):
         'Transforms paths and points to gcode'
         global _previousPoint
         self.gcodeCommands = []
@@ -121,7 +121,7 @@ class Path:
             
             gcodeArgs = [('X', round(point.real, self.decimalPlaces)),
                          ('Y', round(point.imag, self.decimalPlaces)),
-                         ('Z', round(self.z, self.decimalPlaces))]
+                         ('Z', round(self.z + height, self.decimalPlaces))]
             
             pathFeedRateMinute = self.getFeedRateMinute()
             flowRate = self.getFlowRate()
@@ -167,16 +167,16 @@ class Path:
             logger.warning('Path of only one point: %s, this should never happen.', path)
 
 class Loop(Path):
-    def __init__(self, z, runtimeParameters):
-        Path.__init__(self, z, runtimeParameters)
+    def __init__(self, runtimeParameters, z=0):
+        Path.__init__(self, runtimeParameters, z)
 
 class InfillPath(Path):
-    def __init__(self, z, runtimeParameters):        
-        Path.__init__(self, z, runtimeParameters)
+    def __init__(self, runtimeParameters, z=0):        
+        Path.__init__(self, runtimeParameters, z)
             
 class SupportPath(Path):
-    def __init__(self, z, runtimeParameters):        
-        Path.__init__(self, z, runtimeParameters)
+    def __init__(self, runtimeParameters, z=0):        
+        Path.__init__(self, runtimeParameters, z)
 
     def getFeedRateMinute(self):
         return self.supportFeedRateMinute
@@ -184,8 +184,8 @@ class SupportPath(Path):
 class TravelPath(Path):
     '''Moves from one path to another without extruding. Optionally dodges gaps (comb) and retracts (dimension)'''
     
-    def __init__(self, z, runtimeParameters, fromLocation, toLocation, combSkein):
-        Path.__init__(self, z, runtimeParameters)
+    def __init__(self, runtimeParameters, fromLocation, toLocation, combSkein, z=0):
+        Path.__init__(self, runtimeParameters, z)
         self.fromLocation = fromLocation
         self.toLocation = toLocation
         self.combSkein = combSkein
@@ -211,7 +211,7 @@ class TravelPath(Path):
         output.write(Path.__str__(self))
         return output.getvalue()
 
-    def moveToStartPoint(self, feedAndFlowRateMultiplier):
+    def moveToStartPoint(self, height, feedAndFlowRateMultiplier):
         '''Adds gcode to move the nozzle to the startpoint of the path. 
             If comb is active the path will dodge all open spaces.
         '''
@@ -220,7 +220,7 @@ class TravelPath(Path):
         
         if self.combActive and self.fromLocation != None and self.combSkein != None: 
             
-            additionalCommands = self.combSkein.getPathsBetween(self.z, self.fromLocation.dropAxis(), self.toLocation.dropAxis())
+            additionalCommands = self.combSkein.getPathsBetween(self.z + height, self.fromLocation.dropAxis(), self.toLocation.dropAxis())
             startPointPath.extend(additionalCommands)
         
         startPointPath.append(self.toLocation.dropAxis())
@@ -228,7 +228,7 @@ class TravelPath(Path):
         for point in startPointPath:
             gcodeArgs = [('X', round(point.real, self.decimalPlaces)),
                 ('Y', round(point.imag, self.decimalPlaces)),
-                ('Z', round(self.z, self.decimalPlaces))]
+                ('Z', round(self.z + height, self.decimalPlaces))]
             
             if self.speedActive:
                 travelFeedRateMinute, travelFeedRateMultiplier = self.getFeedRateAndMultiplier(self.travelFeedRateMinute, feedAndFlowRateMultiplier)
@@ -241,7 +241,7 @@ class TravelPath(Path):
                 
             self.gcodeCommands.append(GcodeCommand(gcodes.LINEAR_GCODE_MOVEMENT, gcodeArgs))
                         
-    def generateGcode(self, pathExtruder, lookaheadStartVector=None, feedAndFlowRateMultiplier=[1.0, 1.0], runtimeParameters=None):
+    def generateGcode(self, pathExtruder, height, lookaheadStartVector=None, feedAndFlowRateMultiplier=[1.0, 1.0], runtimeParameters=None):
         'Transforms paths and points to gcode'
         global _previousPoint
         
@@ -268,7 +268,7 @@ class TravelPath(Path):
             
         self.gcodeCommands.append(GcodeCommand(gcodes.TURN_EXTRUDER_OFF))
         
-        self.moveToStartPoint(feedAndFlowRateMultiplier[0])
+        self.moveToStartPoint(height, feedAndFlowRateMultiplier[0])
     
         if self.dimensionActive:
             #_previousPoint = self.startPoint            
@@ -282,8 +282,8 @@ class TravelPath(Path):
     
 class BoundaryPerimeter(Path):
     
-    def __init__(self, z, runtimeParameters):
-        Path.__init__(self, z, runtimeParameters)
+    def __init__(self, runtimeParameters, z=0):
+        Path.__init__(self, runtimeParameters, z)
         self.boundaryPoints = []
 
     def __str__(self):

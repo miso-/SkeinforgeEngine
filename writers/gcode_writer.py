@@ -71,20 +71,23 @@ class GcodeWriter:
             nextPoint = path.getStartPoint()
             nextVector = Vector3(nextPoint.real, nextPoint.imag, layer.z)
             
-            travelPath = TravelPath(layer.z, layer.runtimeParameters, previousVector, nextVector, combSkein)
+            travelPath = TravelPath(layer.runtimeParameters, previousVector, nextVector, combSkein)
             
-            self.getPath(travelPath, output, lookaheadVector, layer.feedAndFlowRateMultiplier, verbose)
+            #TODO: We should have used sum of layer.z and containing nestedRing.z as pathheight here,
+            #but this information is lost by getOrderedPathList method and nestedRing.z is allways
+            #zero, so using plain layer.z is OK for now.
+            self.getPath(travelPath, layer.z, output, lookaheadVector, layer.feedAndFlowRateMultiplier, verbose)
             
-            self.getPath(path, output, lookaheadVector, layer.feedAndFlowRateMultiplier, verbose)
+            self.getPath(path, layer.z, output, lookaheadVector, layer.feedAndFlowRateMultiplier, verbose)
         
         for postLayerGcodeCommand in layer.postLayerGcodeCommands:
             output.write(printCommand(postLayerGcodeCommand, verbose))
             
-    def getPath(self, path, output, lookaheadStartVector=None, feedAndFlowRateMultiplier=[1.0, 1.0], verbose=False):
+    def getPath(self, path, pathHeight, output, lookaheadStartVector=None, feedAndFlowRateMultiplier=[1.0, 1.0], verbose=False):
         '''Final Gcode representation.'''
         pathExtruder = self.slicedModel.runtimeParameters.extruders[0]
         
-        path.generateGcode(pathExtruder, lookaheadStartVector, feedAndFlowRateMultiplier, self.slicedModel.runtimeParameters)
+        path.generateGcode(pathExtruder, pathHeight, lookaheadStartVector, feedAndFlowRateMultiplier, self.slicedModel.runtimeParameters)
             
         for command in path.gcodeCommands:
             output.write('%s' % printCommand(command, verbose))

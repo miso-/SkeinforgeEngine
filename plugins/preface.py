@@ -60,7 +60,7 @@ class PrefaceSkein:
 		
 		nestRingPlaceholder = {}
 		for loop in loops:
-			nestedRing = NestedRing(z, self.slicedModel.runtimeParameters)
+			nestedRing = NestedRing(self.slicedModel.runtimeParameters)
 			nestedRing.setBoundaryPerimeter(loop)
 			nestRingPlaceholder[str(loop)] = nestedRing 
 		

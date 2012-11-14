@@ -179,7 +179,7 @@ class SupportSkein:
         supportFlowRateMultiplied = self.supportFlowRateRatio * self.supportFeedRate
 
         for path in paths:
-            supportPath = SupportPath(layer.z, self.slicedModel.runtimeParameters)
+            supportPath = SupportPath(self.slicedModel.runtimeParameters)
             supportPath.addPath(path)
             layer.supportPaths.append(supportPath)
 
