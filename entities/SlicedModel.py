@@ -51,3 +51,23 @@ class SlicedModel:
             output.write(GcodeCommand.printCommand(endGcodeCommand, self.runtimeParameters.verboseGcode))
              
         return output.getvalue()
+        
+    def insertLayers(self, layers, index):
+        '''Inserts list of layers at position given by index.'''
+
+        insertedHeigth = layers[-1].z
+
+        self.shiftLayers(insertedHeigth, index)
+        self.layers = self.layers[:index] + layers + self.layers[index:]
+
+        for i in xrange(index, len(self.layers)):
+            self.layers[i].index = i
+
+    def shiftLayers(self, shiftHeigth, startIndex=0, stopIndex=None):
+        '''Shifts interval of layers by amount specified in shiftHeigth. Use with care to not cause overlaps!'''
+
+        if stopIndex == None:
+            stopIndex = len(self.layers)
+
+        for i in xrange(startIndex, stopIndex):
+            self.layers[i].z += shiftHeigth
