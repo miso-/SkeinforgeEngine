@@ -51,8 +51,6 @@ class ExportSkein:
 		self.exportSlicedModelExtension = config.get(name, 'export.slicedmodel.extension')
 		self.addProfileExtension = config.getboolean(name, 'file.extension.profile')
 		self.overwriteExportedSlicedModel = config.getboolean(name, 'overwrite.exported.slicedmodel')
-		self.firstLayerFeedRateRatio = config.getfloat('speed', 'feed.rate.first.layer.ratio')
-		self.firstLayerFlowRateRatio = config.getfloat('speed', 'flow.rate.first.layer.ratio')
 		
 	def getReplaceableExportGcode(self, nameOfReplaceFile, replaceableExportGcode):
 		'Get text with strings replaced according to replace.csv file.'
@@ -78,9 +76,6 @@ class ExportSkein:
 			
 		return output.getvalue()
 
-	def setFirstLayerRates(self):
-		self.slicedModel.layers[0].feedAndFlowRateMultiplier = [self.firstLayerFeedRateRatio, self.firstLayerFlowRateRatio]
-
 	def export(self):
 		'Perform final modifications to slicedModel and performs export.'
 		
@@ -96,8 +91,6 @@ class ExportSkein:
 				exportFileName += '.' + string.replace(profileName, ' ', '_')
 			exportFileName += '.' + self.fileExtension
 			self.slicedModel.runtimeParameters.outputFilename = exportFileName
-		
-		self.setFirstLayerRates()
 		
 		replaceableExportGcode = self.getReplaceableExportGcode(self.nameOfReplaceFile, GcodeWriter(self.slicedModel).getSlicedModel())		
 		archive.writeFileText(exportFileName, replaceableExportGcode)

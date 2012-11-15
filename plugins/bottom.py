@@ -19,6 +19,12 @@ name = __name__
 
 def performAction(slicedModel):
 	"Align the model to the bottom of the printing plane"
+
+	# HACK these options are in "speed" section so they should be set no matter if bottom plugin is active
+	firstLayerFeedRateRatio = config.getfloat('speed', 'feed.rate.first.layer.ratio')
+	firstLayerFlowRateRatio = config.getfloat('speed', 'flow.rate.first.layer.ratio')
+	slicedModel.layers[0].feedAndFlowRateMultiplier = [firstLayerFeedRateRatio, firstLayerFlowRateRatio]
+	
 	if not config.getboolean(name, 'active'):
 		logger.info("%s plugin is not active", name.capitalize())
 		return
@@ -30,22 +36,13 @@ class BottomSkein:
 		self.slicedModel = slicedModel
 		self.additionalHeightRatio = config.getfloat(name, 'additional.height.ratio')
 		self.altitude = config.getfloat(name, 'altitude')
-		self.layerThickness = config.getfloat('carve', 'layer.height')
+		self.layerHeight = config.getfloat('carve', 'layer.height')
 		self.perimeterWidth = config.getfloat('carve', 'extrusion.width')
 		self.decimalPlaces = config.getint('general', 'decimal.places')
 
 	def bottom(self):
-		"Parse svgText and store the bottom svgText."
+		'''Adjust bottom layer'''
+		zBottom = self.slicedModel.layers[0].z
+		deltaZ = self.altitude + self.additionalHeightRatio * self.layerHeight - zBottom
 		
-		fileName = self.slicedModel.runtimeParameters.inputFilename
-		svgText = self.slicedModel.svgText
-				
-		rotatedLoopLayers = self.slicedModel.rotatedLoopLayers
-		
-		zMinimum = 987654321.0
-		for rotatedLoopLayer in rotatedLoopLayers:
-			zMinimum = min(rotatedLoopLayer.z, zMinimum)
-		deltaZ = self.altitude + self.additionalHeightRatio * self.layerThickness - zMinimum
-		
-		for rotatedLoopLayer in rotatedLoopLayers:
-			rotatedLoopLayer.z += deltaZ
+		self.slicedModel.shiftLayers(deltaZ)
