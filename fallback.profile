@@ -118,6 +118,12 @@ interface.layer.thickness.ratio=1.0
 strategy.path=plugins/strategies
 strategy=DefaultSupportStrategy
 
+[skirt]
+active=true
+gap.over.perimeter.width=5.0
+convex=true
+layers.to.index=1
+
 [dimension]
 active=true
 extrusion.units.relative=false
