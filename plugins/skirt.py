@@ -34,10 +34,13 @@ class SkirtSkein:
         self.slicedModel = slicedModel
 
         self.convex = config.getboolean(name, 'convex')
-        gapOverPerimeterWidth = config.getfloat(name, 'gap.over.perimeter.width')
+        self.gapOverPerimeterWidth = config.getfloat(name, 'gap.over.perimeter.width')
         self.layersTo = config.getint(name, 'layers.to.index')
         self.edgeWidth = slicedModel.runtimeParameters.extrusionWidth
-        self.skirtOutset = (gapOverPerimeterWidth + 0.5) * self.edgeWidth
+        brimWidth = config.getfloat(name, 'brim.width')
+        self.skirtGap = self.gapOverPerimeterWidth * self.edgeWidth + brimWidth
+        self.brimLoopsCount = int(brimWidth / self.edgeWidth)
+        self.outerInner = config.getboolean(name, 'order.outer.inner')
         self.unifiedLoop = LoopCrossDictionary()
         self.createSegmentDictionaries(self.unifiedLoop)
 
@@ -46,16 +49,29 @@ class SkirtSkein:
         if self.layersTo > len(self.slicedModel.layers):
             self.layersTo = len(self.slicedModel.layers)
 
-        for layerIndex in xrange(self.layersTo):
-            self.addLayerToUnifiedLoop(self.slicedModel.layers[layerIndex])
+        self.addLayerToUnifiedLoop(self.slicedModel.layers[0])
+        brimLoops = self.createSkirtLoops(0, self.brimLoopsCount)
 
-        self.createSkirtLoops()
+        if self.gapOverPerimeterWidth != 0:
 
-        for layerIndex in xrange(self.layersTo):
-            for skirtLoop in self.skirtLoops:
-                supportPath = SupportPath(self.slicedModel.runtimeParameters)
-                supportPath.addPath(skirtLoop)
-                self.slicedModel.layers[layerIndex].supportPaths.append(supportPath)
+            for layerIndex in xrange(1, self.layersTo):
+                self.addLayerToUnifiedLoop(self.slicedModel.layers[layerIndex])
+
+            skirtLoops = self.createSkirtLoops(self.skirtGap, 1)
+
+            for layerIndex in xrange(self.layersTo):
+                for skirtLoop in skirtLoops:
+                    supportPath = SupportPath(self.slicedModel.runtimeParameters)
+                    supportPath.addPath(skirtLoop)
+                    self.slicedModel.layers[layerIndex].supportPaths.append(supportPath)
+
+        if self.outerInner:
+            brimLoops.reverse()
+
+        for brimLoop in brimLoops:
+            supportPath = SupportPath(self.slicedModel.runtimeParameters)
+            supportPath.addPath(brimLoop)
+            self.slicedModel.layers[0].supportPaths.append(supportPath)
 
     def addLayerToUnifiedLoop(self, layer):
         'Adds layers outer outline and support path points to self.unifiedLoop'
@@ -97,20 +113,26 @@ class SkirtSkein:
         intercircle.directLoops(True, outerLoops)
         return outerLoops
 
-    def createSkirtLoops(self):
+    def createSkirtLoops(self, gap, shellCount):
         'Create the skirt loops.'
+        outset = gap + self.edgeWidth
+
         points = euclidean.getPointsByHorizontalDictionary(self.edgeWidth, self.unifiedLoop.horizontalDictionary)
         points += euclidean.getPointsByVerticalDictionary(self.edgeWidth, self.unifiedLoop.verticalDictionary)
         loops = triangle_mesh.getDescendingAreaOrientedLoops(points, points, 2.5 * self.edgeWidth)
         outerLoops = self.getOuterLoops(loops)
-        outsetLoops = intercircle.getInsetSeparateLoopsFromLoops(-self.skirtOutset, outerLoops)
-        outsetLoops = self.getOuterLoops(outsetLoops)
-        if self.convex:
-            outsetLoops = [euclidean.getLoopConvex(euclidean.getConcatenatedList(outsetLoops))]
 
-        self.skirtLoops = []
-        for outsetLoop in outsetLoops:
-            self.skirtLoops.append(outsetLoop + [outsetLoop[0]])
+        skirtLoops = []
+        for shellNo in xrange(shellCount):
+            outsetLoops = intercircle.getInsetSeparateLoopsFromLoops(-(outset + self.edgeWidth * shellNo), outerLoops)
+            outsetLoops = self.getOuterLoops(outsetLoops)
+            if self.convex:
+                outsetLoops = [euclidean.getLoopConvex(euclidean.getConcatenatedList(outsetLoops))]
+
+            for outsetLoop in outsetLoops:
+                skirtLoops.append(outsetLoop + [outsetLoop[0]])
+
+        return skirtLoops
 
 class LoopCrossDictionary:
     'Loop with a horizontal and vertical dictionary.'

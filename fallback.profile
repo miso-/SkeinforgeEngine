@@ -123,6 +123,8 @@ active=true
 gap.over.perimeter.width=5.0
 convex=true
 layers.to.index=1
+brim.width=0
+order.outer.inner=true
 
 [dimension]
 active=true
