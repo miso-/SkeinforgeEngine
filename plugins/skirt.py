@@ -77,7 +77,7 @@ class SkirtSkein:
         'Adds layers outer outline and support path points to self.unifiedLoop'
         for outerRing in layer.nestedRings:
             loopCrossDictionary = LoopCrossDictionary()
-            loopCrossDictionary.loop = outerRing.getXYBoundaries()
+            loopCrossDictionary.loop = [outerRing.perimeter.startPoint] + outerRing.perimeter.points
             self.createSegmentDictionaries(loopCrossDictionary)
             self.unifyLayer(loopCrossDictionary)
 
