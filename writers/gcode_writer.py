@@ -76,7 +76,7 @@ class GcodeWriter:
             #TODO: We should have used sum of layer.z and containing nestedRing.z as pathheight here,
             #but this information is lost by getOrderedPathList method and nestedRing.z is allways
             #zero, so using plain layer.z is OK for now.
-            self.getPath(travelPath, layer.z, output, lookaheadVector, layer.feedAndFlowRateMultiplier, verbose)
+            self.getPath(travelPath, layer.z, output, None, layer.feedAndFlowRateMultiplier, verbose)
             
             self.getPath(path, layer.z, output, lookaheadVector, layer.feedAndFlowRateMultiplier, verbose)
         

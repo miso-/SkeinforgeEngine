@@ -253,10 +253,9 @@ class TravelPath(Path):
         
         if self.dimensionActive:
             
-            if lookaheadStartVector != None and self.fromLocation != None:
+            if self.fromLocation != None:
                 
-                toLocation = lookaheadStartVector
-                locationMinusOld = toLocation - self.fromLocation
+                locationMinusOld = self.toLocation - self.fromLocation
                 xyTravel = abs(locationMinusOld.dropAxis())
                 zTravelMultiplied = locationMinusOld.z * self.zDistanceRatio
                 timeToNextThread = math.sqrt(xyTravel * xyTravel + zTravelMultiplied * zTravelMultiplied) / self.extrusionFeedRateMinute * 60
