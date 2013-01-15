@@ -18,24 +18,24 @@ class SimpleEditor(wx.Dialog):
         self.originalText = text
         self.filename = filename
         self.readonly = readonly
-        
+
         if self.readonly:
             self.title = '%s (readonly)'%filename
         else :
             self.title = filename
-        
+
         wx.Dialog.__init__(self, None, title=self.title, style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
         self.callback = callback
         self.panel = wx.Panel(self, -1)
         topsizer = wx.BoxSizer(wx.VERTICAL)
-        
+
         self.editorTxtCtrl = wx.TextCtrl(self.panel, style=wx.TE_MULTILINE + wx.HSCROLL, size=(400, 300))
         self.editorTxtCtrl.SetValue(text)
         self.editorTxtCtrl.SetEditable(not self.readonly)
         self.editorTxtCtrl.Bind(wx.EVT_TEXT, self.onTextChange)
-        
+
         topsizer.Add(self.editorTxtCtrl, 1, wx.ALL + wx.EXPAND)
-        
+
         commandsizer = wx.BoxSizer(wx.HORIZONTAL)
         self.okBtn = wx.Button(self.panel, -1, "Save")
         self.okBtn.Bind(wx.EVT_BUTTON, self.save)
@@ -47,18 +47,18 @@ class SimpleEditor(wx.Dialog):
         self.cancelBtn.Bind(wx.EVT_BUTTON, self.close)
         commandsizer.Add(self.cancelBtn)
         topsizer.Add(commandsizer, 0, wx.EXPAND)
-        
+
         self.panel.SetSizer(topsizer)
         topsizer.Layout()
         topsizer.Fit(self)
         self.Show()
         self.editorTxtCtrl.SetFocus()
         self.editorTxtCtrl.SetSelection(0,0)
-        
+
     def save(self, event):
         self.Destroy()
         self.callback(self.editorTxtCtrl.GetValue())
-        
+
     def close(self, event):
         self.Destroy()
 
@@ -74,7 +74,7 @@ class SimpleEditor(wx.Dialog):
                 elif result == wx.ID_NO:
                     self.close(event)
         event.Skip()
-    
+
     def onTextChange(self, event):
         if self.editorTxtCtrl.GetValue() != self.originalText:
             self.SetTitle("%s*"%self.title)

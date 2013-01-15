@@ -3,10 +3,10 @@ Fills a layer using a line pattern.
 
 Credits:
     Original Author: Enrique Perez (http://skeinforge.com)
-    Contributors: Please see the documentation in Skeinforge 
-    Modifed as SFACT: Ahmet Cem Turan (github.com/ahmetcemturan/SFACT)    
+    Contributors: Please see the documentation in Skeinforge
+    Modifed as SFACT: Ahmet Cem Turan (github.com/ahmetcemturan/SFACT)
 
-License: 
+License:
     GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 """
 
@@ -26,7 +26,7 @@ class LineFillStrategy:
     def __init__(self, slicedModel):
         # TODO - remove or reduce dependency on slicedModel
         self.slicedModel = slicedModel
-        
+
         self.infillSolidity = config.getfloat('fill', 'infill.solidity.ratio')
         self.infillWidthOverThickness = config.getfloat('fill', 'extrusion.lines.extra.spacer.scaler')
         self.infillPerimeterOverlap = config.getfloat('fill', 'infill.overlap.over.perimeter.scaler')
@@ -49,7 +49,7 @@ class LineFillStrategy:
         self.betweenWidth = self.extrusionWidth * self.infillWidthOverThickness * (0.7853)
         self.previousExtraShells = -1
         self.oldOrderedLocation = None
-        
+
     def fill(self, layer):
         'Add fill to the carve layer.'
         layerIndex = layer.index
@@ -59,13 +59,13 @@ class LineFillStrategy:
         betweenWidth = self.extrusionWidth / 1.7594801994   # this really sucks I cant find hwe#(self.repository.infillWidthOverThickness.value * self.extrusionWidth *(0.7853))/1.5 #- 0.0866#todo todo TODO *0.5 is the distance between the outer loops..
         self.layerExtrusionWidth = self.infillWidth # spacing between fill lines
         layerFillInset = self.infillWidth  # the distance between perimeter incl loops and the fill pattern
-        
+
         layerRotation = self.getLayerRotation(layerIndex, layer)
         reverseRotation = complex(layerRotation.real, -layerRotation.imag)
         surroundingCarves = []
         layerRemainder = layerIndex % self.diaphragmPeriod
         extraShells = self.extraShellsSparseLayer
-        
+
         if layerRemainder >= self.diaphragmThickness and layer.bridgeRotation == None:
             for surroundingIndex in xrange(1, self.solidSurfaceThickness + 1):
                 self.addRotatedCarve(layerIndex, -surroundingIndex, reverseRotation, surroundingCarves)
@@ -75,13 +75,13 @@ class LineFillStrategy:
             extraShells = self.extraShellsAlternatingSolidLayer
             if self.previousExtraShells != self.extraShellsBase:
                 extraShells = self.extraShellsBase
-         
+
         if layer.bridgeRotation != None:
             extraShells = 0
             betweenWidth *= self.bridgeWidthMultiplier#/0.7853  #todo check what is better with or without the normalizer
             self.layerExtrusionWidth *= self.bridgeWidthMultiplier
             layerFillInset *= self.bridgeWidthMultiplier
-         
+
         aroundInset = 0.25 * self.layerExtrusionWidth
         aroundWidth = 0.25 * self.layerExtrusionWidth
         self.previousExtraShells = extraShells
@@ -90,22 +90,22 @@ class LineFillStrategy:
         endpoints = []
         infillPaths = []
         layerInfillSolidity = self.infillSolidity
-        
+
         self.isDoubleJunction = True
         self.isJunctionWide = True
         rotatedLoops = []
 
         nestedRings = layer.nestedRings
-        
+
         createFillForSurroundings(nestedRings, betweenWidth, False)
-         
+
         for extraShellIndex in xrange(extraShells):
             createFillForSurroundings(nestedRings, self.layerExtrusionWidth, True)
 
         fillLoops = euclidean.getFillOfSurroundings(nestedRings, None)
-        
+
         slightlyGreaterThanFill = 1.001 * layerFillInset #todo was 1.01 ACT 0.95  How much the parallel fill is filled
-         
+
         for loop in fillLoops:
             alreadyFilledLoop = []
             alreadyFilledArounds.append(alreadyFilledLoop)
@@ -122,11 +122,11 @@ class LineFillStrategy:
                         around.reverse()
                         arounds.append(around)
                         euclidean.addLoopToPixelTable(around, pixelTable, aroundWidth)
-         
+
         if len(arounds) < 1:
             self.addThreadsBridgeLayer(layerIndex, nestedRings, layer)
             return
-         
+
         back = euclidean.getBackOfLoops(arounds)
         front = euclidean.getFrontOfLoops(arounds)
         front = math.ceil(front / self.layerExtrusionWidth) * self.layerExtrusionWidth
@@ -137,7 +137,7 @@ class LineFillStrategy:
         self.surroundingXIntersectionLists = []
         self.yList = []
         removedEndpoints = []
-         
+
         if len(surroundingCarves) >= self.doubleSolidSurfaceThickness:
             xIntersectionIndexLists = []
             self.frontOverWidth = euclidean.getFrontOverWidthAddXListYList(front, surroundingCarves, numberOfLines, xIntersectionIndexLists, self.layerExtrusionWidth, self.yList)
@@ -149,23 +149,23 @@ class LineFillStrategy:
         else:
             for fillLine in xrange(len(self.horizontalSegmentLists)):
                 addSparseEndpoints(doubleExtrusionWidth, endpoints, fillLine, self.horizontalSegmentLists, layerInfillSolidity, removedEndpoints, self.solidSurfaceThickness, None)
-         
+
         paths = euclidean.getPathsFromEndpoints(endpoints, 5.0 * self.layerExtrusionWidth, pixelTable, aroundWidth)
-         
+
         oldRemovedEndpointLength = len(removedEndpoints) + 1
-         
+
         while oldRemovedEndpointLength - len(removedEndpoints) > 0:
             oldRemovedEndpointLength = len(removedEndpoints)
             removeEndpoints(pixelTable, self.layerExtrusionWidth, paths, removedEndpoints, aroundWidth)
-        
+
         paths = euclidean.getConnectedPaths(paths, pixelTable, aroundWidth)
-         
+
         for path in paths:
             addPathToInfillPaths(self.layerExtrusionWidth, infillPaths, path, layerRotation)
 
         for nestedRing in nestedRings:
             nestedRing.transferPaths(infillPaths)
-         
+
         self.addThreadsBridgeLayer(layerIndex, nestedRings, layer)
 
     def addRotatedCarve(self, currentLayer, layerDelta, reverseRotation, surroundingCarves):
@@ -173,9 +173,9 @@ class LineFillStrategy:
         layerIndex = currentLayer + layerDelta
         if layerIndex < 0 or layerIndex >= len(self.slicedModel.layers):
             return
-        
+
         layer = self.slicedModel.layers[layerIndex]
-        
+
         nestedRings = layer.nestedRings
         rotatedCarve = []
         for nestedRing in nestedRings:
@@ -280,7 +280,7 @@ def createExtraFillLoops(nestedRing, radius, shouldExtraLoopsBeAdded):
 
     loopsToBeFilled = nestedRing.getLoopsToBeFilled()
     allFillLoops = getExtraFillLoops(loopsToBeFilled , radius)
-    
+
     if len(allFillLoops) < 1:
         return
     if shouldExtraLoopsBeAdded:
@@ -290,7 +290,7 @@ def createExtraFillLoops(nestedRing, radius, shouldExtraLoopsBeAdded):
 
 def createFillForSurroundings(nestedRings, radius, shouldExtraLoopsBeAdded):
     'Create extra fill loops for surrounding loops.'
-    for nestedRing in nestedRings: 
+    for nestedRing in nestedRings:
         createExtraFillLoops(nestedRing, radius, shouldExtraLoopsBeAdded)
 
 def getAdditionalLength(path, point, pointIndex):

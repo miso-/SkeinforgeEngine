@@ -30,45 +30,45 @@ __license__ = 'GNU Affero General Public License http://www.gnu.org/licenses/agp
 
 
 def getFromGNUTriangulatedSurfaceText( gnuTriangulatedSurfaceText, triangleMesh ):
-	"Initialize from a GNU Triangulated Surface Text."
-	if gnuTriangulatedSurfaceText == '':
-		return None
-	lines = archive.getTextLines( gnuTriangulatedSurfaceText )
-	linesWithoutComments = []
-	for line in lines:
-		if len(line) > 0:
-			firstCharacter = line[0]
-			if firstCharacter != '#' and firstCharacter != '!':
-				linesWithoutComments.append(line)
-	splitLine = linesWithoutComments[0].split()
-	numberOfVertexes = int( splitLine[0] )
-	numberOfEdges = int(splitLine[1])
-	numberOfFaces = int( splitLine[2] )
-	faceTriples = []
-	for vertexIndex in xrange( numberOfVertexes ):
-		line = linesWithoutComments[ vertexIndex + 1 ]
-		splitLine = line.split()
-		vertex = Vector3( float( splitLine[0] ), float(splitLine[1]), float( splitLine[2] ) )
-		triangleMesh.vertexes.append(vertex)
-	edgeStart = numberOfVertexes + 1
-	for edgeIndex in xrange( numberOfEdges ):
-		line = linesWithoutComments[ edgeIndex + edgeStart ]
-		splitLine = line.split()
-		vertexIndexes = []
-		for word in splitLine[ : 2 ]:
-			vertexIndexes.append( int(word) - 1 )
-		edge = face.Edge().getFromVertexIndexes( edgeIndex, vertexIndexes )
-		triangleMesh.edges.append( edge )
-	faceStart = edgeStart + numberOfEdges
-	for faceIndex in xrange( numberOfFaces ):
-		line = linesWithoutComments[ faceIndex + faceStart ]
-		splitLine = line.split()
-		edgeIndexes = []
-		for word in splitLine[ : 3 ]:
-			edgeIndexes.append( int(word) - 1 )
-		triangleMesh.faces.append( face.Face().getFromEdgeIndexes( edgeIndexes, triangleMesh.edges, faceIndex ) )
-	return triangleMesh
+    "Initialize from a GNU Triangulated Surface Text."
+    if gnuTriangulatedSurfaceText == '':
+        return None
+    lines = archive.getTextLines( gnuTriangulatedSurfaceText )
+    linesWithoutComments = []
+    for line in lines:
+        if len(line) > 0:
+            firstCharacter = line[0]
+            if firstCharacter != '#' and firstCharacter != '!':
+                linesWithoutComments.append(line)
+    splitLine = linesWithoutComments[0].split()
+    numberOfVertexes = int( splitLine[0] )
+    numberOfEdges = int(splitLine[1])
+    numberOfFaces = int( splitLine[2] )
+    faceTriples = []
+    for vertexIndex in xrange( numberOfVertexes ):
+        line = linesWithoutComments[ vertexIndex + 1 ]
+        splitLine = line.split()
+        vertex = Vector3( float( splitLine[0] ), float(splitLine[1]), float( splitLine[2] ) )
+        triangleMesh.vertexes.append(vertex)
+    edgeStart = numberOfVertexes + 1
+    for edgeIndex in xrange( numberOfEdges ):
+        line = linesWithoutComments[ edgeIndex + edgeStart ]
+        splitLine = line.split()
+        vertexIndexes = []
+        for word in splitLine[ : 2 ]:
+            vertexIndexes.append( int(word) - 1 )
+        edge = face.Edge().getFromVertexIndexes( edgeIndex, vertexIndexes )
+        triangleMesh.edges.append( edge )
+    faceStart = edgeStart + numberOfEdges
+    for faceIndex in xrange( numberOfFaces ):
+        line = linesWithoutComments[ faceIndex + faceStart ]
+        splitLine = line.split()
+        edgeIndexes = []
+        for word in splitLine[ : 3 ]:
+            edgeIndexes.append( int(word) - 1 )
+        triangleMesh.faces.append( face.Face().getFromEdgeIndexes( edgeIndexes, triangleMesh.edges, faceIndex ) )
+    return triangleMesh
 
 def getCarving(fileName):
-	"Get the carving for the gts file."
-	return getFromGNUTriangulatedSurfaceText( archive.getFileText(fileName), triangle_mesh.TriangleMesh() )
+    "Get the carving for the gts file."
+    return getFromGNUTriangulatedSurfaceText( archive.getFileText(fileName), triangle_mesh.TriangleMesh() )

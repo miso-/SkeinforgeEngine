@@ -32,44 +32,44 @@ __license__ = 'GNU Affero General Public License http://www.gnu.org/licenses/agp
 
 
 def addFacesGivenText( objText, triangleMesh ):
-	"Add faces given obj text."
-	lines = archive.getTextLines( objText )
-	for line in lines:
-		splitLine = line.split()
-		if len(splitLine) > 0:
-			firstWord = splitLine[0]
-		else:
-			firstWord =  ''
-		if firstWord == 'v':
-			triangleMesh.vertexes.append( getVertexGivenLine(line) )
-		elif firstWord == 'f':
-			triangleMesh.faces.append( getFaceGivenLine( line, triangleMesh ) )
+    "Add faces given obj text."
+    lines = archive.getTextLines( objText )
+    for line in lines:
+        splitLine = line.split()
+        if len(splitLine) > 0:
+            firstWord = splitLine[0]
+        else:
+            firstWord =  ''
+        if firstWord == 'v':
+            triangleMesh.vertexes.append( getVertexGivenLine(line) )
+        elif firstWord == 'f':
+            triangleMesh.faces.append( getFaceGivenLine( line, triangleMesh ) )
 
 def getFaceGivenLine( line, triangleMesh ):
-	"Add face given line index and lines."
-	faceGivenLine = face.Face()
-	faceGivenLine.index = len( triangleMesh.faces )
-	splitLine = line.split()
-	for vertexStringIndex in xrange( 1, 4 ):
-		vertexString = splitLine[ vertexStringIndex ]
-		vertexStringWithSpaces = vertexString.replace('/', ' ')
-		vertexStringSplit = vertexStringWithSpaces.split()
-		vertexIndex = int( vertexStringSplit[0] ) - 1
-		faceGivenLine.vertexIndexes.append(vertexIndex)
-	return faceGivenLine
+    "Add face given line index and lines."
+    faceGivenLine = face.Face()
+    faceGivenLine.index = len( triangleMesh.faces )
+    splitLine = line.split()
+    for vertexStringIndex in xrange( 1, 4 ):
+        vertexString = splitLine[ vertexStringIndex ]
+        vertexStringWithSpaces = vertexString.replace('/', ' ')
+        vertexStringSplit = vertexStringWithSpaces.split()
+        vertexIndex = int( vertexStringSplit[0] ) - 1
+        faceGivenLine.vertexIndexes.append(vertexIndex)
+    return faceGivenLine
 
 def getCarving(fileName=''):
-	"Get the triangle mesh for the obj file."
-	if fileName == '':
-		return None
-	objText = archive.getFileText(fileName, True, 'rb')
-	if objText == '':
-		return None
-	triangleMesh = triangle_mesh.TriangleMesh()
-	addFacesGivenText(objText, triangleMesh)
-	return triangleMesh
+    "Get the triangle mesh for the obj file."
+    if fileName == '':
+        return None
+    objText = archive.getFileText(fileName, True, 'rb')
+    if objText == '':
+        return None
+    triangleMesh = triangle_mesh.TriangleMesh()
+    addFacesGivenText(objText, triangleMesh)
+    return triangleMesh
 
 def getVertexGivenLine(line):
-	"Get vertex given obj vertex line."
-	splitLine = line.split()
-	return Vector3( float(splitLine[1]), float( splitLine[2] ), float( splitLine[3] ) )
+    "Get vertex given obj vertex line."
+    splitLine = line.split()
+    return Vector3( float(splitLine[1]), float( splitLine[2] ), float( splitLine[3] ) )

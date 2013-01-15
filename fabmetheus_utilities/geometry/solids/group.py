@@ -16,59 +16,59 @@ __license__ = 'GNU Affero General Public License http://www.gnu.org/licenses/agp
 
 
 def convertXMLElement(geometryOutput, xmlElement):
-	"Convert the xml element to a group xml element."
-	convertContainerXMLElement(geometryOutput, xmlElement, Group())
+    "Convert the xml element to a group xml element."
+    convertContainerXMLElement(geometryOutput, xmlElement, Group())
 
 def convertContainerXMLElement(geometryOutput, xmlElement, xmlObject):
-	"Convert the xml element to a group xml element."
-	xmlElement.linkObject(xmlObject)
-	matrix.getBranchMatrixSetXMLElement(xmlElement)
-	xmlElement.getXMLProcessor().createChildNodes(geometryOutput['shapes'], xmlElement)
+    "Convert the xml element to a group xml element."
+    xmlElement.linkObject(xmlObject)
+    matrix.getBranchMatrixSetXMLElement(xmlElement)
+    xmlElement.getXMLProcessor().createChildNodes(geometryOutput['shapes'], xmlElement)
 
 def processXMLElement(xmlElement):
-	"Process the xml element."
-	evaluate.processArchivable(Group, xmlElement)
+    "Process the xml element."
+    evaluate.processArchivable(Group, xmlElement)
 
 
 class Group(dictionary.Dictionary):
-	"A group."
-	def __init__(self):
-		"Add empty lists."
-		dictionary.Dictionary.__init__(self)
-		self.matrix4X4 = matrix.Matrix()
+    "A group."
+    def __init__(self):
+        "Add empty lists."
+        dictionary.Dictionary.__init__(self)
+        self.matrix4X4 = matrix.Matrix()
 
-	def addXMLInnerSection(self, depth, output):
-		"Add xml inner section for this object."
-		if self.matrix4X4 != None:
-			self.matrix4X4.addXML(depth, output)
-		self.addXMLSection(depth, output)
+    def addXMLInnerSection(self, depth, output):
+        "Add xml inner section for this object."
+        if self.matrix4X4 != None:
+            self.matrix4X4.addXML(depth, output)
+        self.addXMLSection(depth, output)
 
-	def addXMLSection(self, depth, output):
-		"Add the xml section for this object."
-		pass
+    def addXMLSection(self, depth, output):
+        "Add the xml section for this object."
+        pass
 
-	def getLoops(self, importRadius, z):
-		"Get loops sliced through shape."
-		visibleObjects = evaluate.getVisibleObjects(self.archivableObjects)
-		loops = []
-		for visibleObject in visibleObjects:
-			loops += visibleObject.getLoops(importRadius, z)
-		return loops
+    def getLoops(self, importRadius, z):
+        "Get loops sliced through shape."
+        visibleObjects = evaluate.getVisibleObjects(self.archivableObjects)
+        loops = []
+        for visibleObject in visibleObjects:
+            loops += visibleObject.getLoops(importRadius, z)
+        return loops
 
-	def getMatrix4X4(self):
-		"Get the matrix4X4."
-		return self.matrix4X4
+    def getMatrix4X4(self):
+        "Get the matrix4X4."
+        return self.matrix4X4
 
-	def getMatrixChainTetragrid(self):
-		"Get the matrix chain tetragrid."
-		return matrix.getTetragridTimesOther(self.xmlElement.parentNode.xmlObject.getMatrixChainTetragrid(), self.matrix4X4.tetragrid)
+    def getMatrixChainTetragrid(self):
+        "Get the matrix chain tetragrid."
+        return matrix.getTetragridTimesOther(self.xmlElement.parentNode.xmlObject.getMatrixChainTetragrid(), self.matrix4X4.tetragrid)
 
-	def getVisible(self):
-		"Get visible."
-		return euclidean.getBooleanFromDictionary(True, self.getAttributeDictionary(), 'visible')
+    def getVisible(self):
+        "Get visible."
+        return euclidean.getBooleanFromDictionary(True, self.getAttributeDictionary(), 'visible')
 
-	def setToXMLElement(self, xmlElement):
-		'Set to xmlElement.'
-		self.xmlElement = xmlElement
-		xmlElement.parentNode.xmlObject.archivableObjects.append(self)
-		matrix.getBranchMatrixSetXMLElement(xmlElement)
+    def setToXMLElement(self, xmlElement):
+        'Set to xmlElement.'
+        self.xmlElement = xmlElement
+        xmlElement.parentNode.xmlObject.archivableObjects.append(self)
+        matrix.getBranchMatrixSetXMLElement(xmlElement)

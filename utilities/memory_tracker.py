@@ -13,7 +13,7 @@ except:
 def track_object(o):
     if tracker != None:
         tracker.track_object(o, resolution_level=2)
-    
+
 def track_class(c):
     if tracker != None:
         tracker.track_class(c, trace=1, resolution_level=1)

@@ -16,10 +16,10 @@ class GcodeCommand:
         if parameters == None:
             parameters = {}
         self.parameters = OrderedDict(parameters)
-    
+
     def __str__(self):
-        return self.str(False) 
-    
+        return self.str(False)
+
     def str(self, verbose=False):
         '''Get the string representation.'''
         output = StringIO()
@@ -34,7 +34,7 @@ class GcodeCommand:
     @staticmethod
     def printCommand(command, verbose=False):
         if command == None:
-            return 
+            return
         if isinstance(command, GcodeCommand):
             return'%s\n' % command.str(verbose)
         else:

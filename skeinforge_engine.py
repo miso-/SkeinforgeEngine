@@ -18,27 +18,27 @@ import re
 import sys
 import time
 import traceback
-try: 
+try:
     import cPickle as pickle
 except:
     import pickle
-    
+
 __plugins_path__ = 'plugins'
 logger = logging.getLogger('engine')
 
 def getCraftedTextFromPlugins(pluginSequence, gcode):
-	'Get a crafted shape file from a list of pluginSequence.'
-	lastProcedureTime = time.time()
-	if __plugins_path__ not in sys.path:
-		sys.path.insert(0, __plugins_path__)	
-	for plugin in pluginSequence:
-		pluginModule = import_module(plugin)
-		if pluginModule != None:
-			if gcode.runtimeParameters.profileMemory:
-				memory_tracker.create_snapshot('Before %s action' % plugin)
-			pluginModule.performAction(gcode)
-			logger.info('%s plugin took %s seconds.', plugin.capitalize(), timedelta(seconds=time.time() - lastProcedureTime).total_seconds())
-			lastProcedureTime = time.time()
+    'Get a crafted shape file from a list of pluginSequence.'
+    lastProcedureTime = time.time()
+    if __plugins_path__ not in sys.path:
+        sys.path.insert(0, __plugins_path__)
+    for plugin in pluginSequence:
+        pluginModule = import_module(plugin)
+        if pluginModule != None:
+            if gcode.runtimeParameters.profileMemory:
+                memory_tracker.create_snapshot('Before %s action' % plugin)
+            pluginModule.performAction(gcode)
+            logger.info('%s plugin took %s seconds.', plugin.capitalize(), timedelta(seconds=time.time() - lastProcedureTime).total_seconds())
+            lastProcedureTime = time.time()
 
 def main(argv=None):
     "Starting point for skeinforge engine."
@@ -49,93 +49,93 @@ def main(argv=None):
     parser.add_argument('-o', metavar='output', help='Output filename. Overrides other export filename settings.')
     parser.add_argument('-r', metavar='reprocess', help='Comma seperated list of plugins to reprocess a sliced model file. The export plugin is automatically appended.')
 
-    
-    if argv is None: 
-    	argv = sys.argv[1:]
+
+    if argv is None:
+        argv = sys.argv[1:]
     args = parser.parse_args(argv)
-    
+
     if args.c == None:
-    	logger.error('Invalid or missing configuration file.')
-    	return
+        logger.error('Invalid or missing configuration file.')
+        return
     config.read(args.c)
-    
+
     logLevel = config.get('general', 'log.level')
     logging.basicConfig(level=logLevel, format='%(asctime)s %(levelname)s (%(name)s) %(message)s')
-    	
+
     defaultProfile = config.get('general', 'default.profile')
     if defaultProfile != None:
-    	config.read(defaultProfile)
+        config.read(defaultProfile)
     profileName = config.get('profile', 'name')
-    
+
     if args.p != None:
-    	config.read(args.p)
+        config.read(args.p)
         if profileName == 'default':
             profileName = os.path.splitext(os.path.basename(args.p))[0]
-    
+
     logger.info("Profile: %s", profileName)
-        
+
     inputFilename = args.file
-    
+
     if not os.path.isfile(inputFilename):
-    	logger.error('File not found: %s', inputFilename)
-    	return
- 
+        logger.error('File not found: %s', inputFilename)
+        return
+
     logger.info("Processing file: %s", os.path.basename(inputFilename))
-    
+
     exportedSlicedModelExtension = config.get('export', 'export.slicedmodel.extension')
     if inputFilename.endswith(exportedSlicedModelExtension):
         slicedModel = pickle.load(open(inputFilename))
         slicedModel.runtimeParameters = RuntimeParameters()
         inputFilename = inputFilename.replace('.'+exportedSlicedModelExtension, '')
     else:
-    	slicedModel = SlicedModel()
-    
+        slicedModel = SlicedModel()
+
     if args.o != None:
         slicedModel.runtimeParameters.outputFilename = args.o
-    
+
     if args.r != None:
-    	pluginSequence = args.r.split(',')
-    	if 'export' not in pluginSequence:
-    		pluginSequence.append('export')
+        pluginSequence = args.r.split(',')
+        if 'export' not in pluginSequence:
+            pluginSequence.append('export')
     else:
-    	pluginSequence = config.get('general', 'plugin.sequence').split(',')
-    
+        pluginSequence = config.get('general', 'plugin.sequence').split(',')
+
     if inputFilename.endswith(exportedSlicedModelExtension) and 'carve' in pluginSequence:
         logger.error('Reprocessing a sliced model file with carve is not possible. Please process the original file or choose a different reprocessing sequence.')
         return
-    
+
     logger.debug("Plugin Sequence: %s", pluginSequence)
-    
+
     if slicedModel.runtimeParameters.profileMemory:
-    	memory_tracker.track_object(slicedModel)
-    	memory_tracker.create_snapshot('Start')
-    
+        memory_tracker.track_object(slicedModel)
+        memory_tracker.create_snapshot('Start')
+
     slicedModel.runtimeParameters.profileName = profileName
     slicedModel.runtimeParameters.inputFilename = inputFilename
-    
+
     setupExtruders(slicedModel)
-    
+
     getCraftedTextFromPlugins(pluginSequence[:], slicedModel)
-    
+
     slicedModel.runtimeParameters.endTime = time.time()
-    
+
     logger.info('It took %s seconds to complete.', timedelta(seconds=slicedModel.runtimeParameters.endTime - slicedModel.runtimeParameters.startTime).total_seconds())
-    
+
     if slicedModel.runtimeParameters.profileMemory:
-    	memory_tracker.create_snapshot('End')
-    	if config.getboolean('general', 'profile.memory.print.summary'):
-    		memory_tracker.tracker.stats.print_summary()
-    	if config.getboolean('general', 'profile.memory.export.data'):
-    		memory_tracker.tracker.stats.dump_stats('%s.memory_tracker.dat' % inputFilename)
-    	if config.getboolean('general', 'profile.memory.export.html'):
-    		from pympler.classtracker_stats import HtmlStats
-    		HtmlStats(tracker=memory_tracker.tracker).create_html('%s.memory_tracker.html' % inputFilename)
-            
+        memory_tracker.create_snapshot('End')
+        if config.getboolean('general', 'profile.memory.print.summary'):
+            memory_tracker.tracker.stats.print_summary()
+        if config.getboolean('general', 'profile.memory.export.data'):
+            memory_tracker.tracker.stats.dump_stats('%s.memory_tracker.dat' % inputFilename)
+        if config.getboolean('general', 'profile.memory.export.html'):
+            from pympler.classtracker_stats import HtmlStats
+            HtmlStats(tracker=memory_tracker.tracker).create_html('%s.memory_tracker.html' % inputFilename)
+
     return slicedModel
 
 def handleError(self, record):
-	traceback.print_stack()
+    traceback.print_stack()
 
 if __name__ == "__main__":
-	logging.Handler.handleError = handleError	
-	main()
+    logging.Handler.handleError = handleError
+    main()

@@ -10,18 +10,18 @@ import entities.paths as paths
 
 class GcodeWriter:
     '''Writes the slicedModel for a sliced model.'''
-    
+
     def __init__(self, slicedModel):
         self.slicedModel = slicedModel
-        
-        
+
+
     def getSlicedModel(self, verbose=False):
         '''Final Gcode representation.'''
         output = StringIO.StringIO()
-                    
+
         for startCommand in self.slicedModel.startGcodeCommands:
             output.write(printCommand(startCommand, verbose))
-            
+
         lookaheadStartVector = None
         lookaheadKeyIndex = 0
         layerCount = len(self.slicedModel.layers)
@@ -32,29 +32,29 @@ class GcodeWriter:
                 lookaheadLayer = self.slicedModel.layers[lookaheadIndex]
                 lookaheadStartPoint = lookaheadLayer.getStartPoint()
                 if lookaheadStartPoint != None:
-                        lookaheadStartVector = Vector3(lookaheadStartPoint.real, lookaheadStartPoint.imag, lookaheadLayer.z)
+                    lookaheadStartVector = Vector3(lookaheadStartPoint.real, lookaheadStartPoint.imag, lookaheadLayer.z)
 
             self.getLayer(layer, output, lookaheadStartVector, verbose)
-            
+
         for endCommand in self.slicedModel.endGcodeCommands:
             output.write(printCommand(endCommand, verbose))
-                        
+
         return output.getvalue()
-    
-    
+
+
     def getLayer(self, layer, output, parentLookaheadStartVector=None, verbose=False):
         '''Final Gcode representation.'''
         for preLayerGcodeCommand in layer.preLayerGcodeCommands:
             output.write(printCommand(preLayerGcodeCommand, verbose))
-        
-        if layer.runtimeParameters.combActive: 
+
+        if layer.runtimeParameters.combActive:
             combSkein = CombSkein(layer)
         else:
-            combSkein = None                        
-        
+            combSkein = None
+
         pathList = layer.getOrderedPathList()
         paths.resetExtrusionStats()
-        
+
         pathListCount = len(pathList)
         for (index, path) in enumerate(pathList):
             if index + 1 < pathListCount:
@@ -62,39 +62,39 @@ class GcodeWriter:
                 lookaheadVector = Vector3(lookaheadStartPoint.real, lookaheadStartPoint.imag, layer.z)
             else:
                 lookaheadVector = parentLookaheadStartVector
-                
+
             previousVector = None
             if index > 0:
                 previousPoint = pathList[index - 1].getEndPoint()
                 previousVector = Vector3(previousPoint.real, previousPoint.imag, layer.z)
-                
+
             nextPoint = path.getStartPoint()
             nextVector = Vector3(nextPoint.real, nextPoint.imag, layer.z)
-            
+
             travelPath = TravelPath(layer.runtimeParameters, previousVector, nextVector, combSkein)
-            
+
             #TODO: We should have used sum of layer.z and containing nestedRing.z as pathheight here,
             #but this information is lost by getOrderedPathList method and nestedRing.z is allways
             #zero, so using plain layer.z is OK for now.
             self.getPath(travelPath, layer.z, output, None, layer.feedAndFlowRateMultiplier, verbose)
-            
+
             self.getPath(path, layer.z, output, lookaheadVector, layer.feedAndFlowRateMultiplier, verbose)
-        
+
         for postLayerGcodeCommand in layer.postLayerGcodeCommands:
             output.write(printCommand(postLayerGcodeCommand, verbose))
-            
+
     def getPath(self, path, pathHeight, output, lookaheadStartVector=None, feedAndFlowRateMultiplier=[1.0, 1.0], verbose=False):
         '''Final Gcode representation.'''
         pathExtruder = self.slicedModel.runtimeParameters.extruders[0]
-        
+
         path.generateGcode(pathExtruder, pathHeight, lookaheadStartVector, feedAndFlowRateMultiplier, self.slicedModel.runtimeParameters)
-            
+
         for command in path.gcodeCommands:
             output.write('%s' % printCommand(command, verbose))
 
 def printCommand(command, verbose=False):
     if command == None:
-        return 
+        return
     if isinstance(command, GcodeCommand):
         return'%s\n' % command.str(verbose)
     else:

@@ -13,23 +13,22 @@ def getStrategy(runtimeParameters):
 class SlowDownCoolStrategy:
     '''Allows a layer to cool slowing down the nozzle movement.'''
     def __init__(self, runtimeParameters):
-        
+
         self.minimumLayerTime = config.getfloat('cool','minimum.layer.time')
-                
-        
+
+
     def cool(self, layer):
         '''Apply the cooling by slowing down the print rate.
-            Note: This strategy only sets the feed/flow multiplier for the layer. The gcode 
+            Note: This strategy only sets the feed/flow multiplier for the layer. The gcode
             engine determines whether this or the minimum layer feed rate is actually used.
             This allows the speed of the gcode to be modified without having to recalculate
-            the slowdown ratio.  
+            the slowdown ratio.
         '''
-        
+
         (layerDistance, layerDuration) = layer.getDistanceAndDuration()
-        
+
         if layerDuration != 0:
-                #can't increase empty layer duration by slowing down
-                
-                layer.feedAndFlowRateMultiplier[0] = min(1.0, layerDuration / self.minimumLayerTime)
-                layer.feedAndFlowRateMultiplier[1] = layer.feedAndFlowRateMultiplier[0]
-        
+            #can't increase empty layer duration by slowing down
+
+            layer.feedAndFlowRateMultiplier[0] = min(1.0, layerDuration / self.minimumLayerTime)
+            layer.feedAndFlowRateMultiplier[1] = layer.feedAndFlowRateMultiplier[0]

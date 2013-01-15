@@ -5,16 +5,16 @@ import math
 import sys
 import time
 from RuntimeParameters import RuntimeParameters
-from GcodeCommand import GcodeCommand 
+from GcodeCommand import GcodeCommand
 
 class SlicedModel:
     '''Runtime data for conversion of 3D model to gcode.'''
-    
+
     def __init__(self):
 
         self.runtimeParameters = RuntimeParameters()
         self.layers = []
-        
+
         self.startGcodeCommands = []
         self.endGcodeCommands = []
         self.elementOffsets = None
@@ -22,36 +22,36 @@ class SlicedModel:
         self.svgText = None
         self.carvingCornerMaximum = None
         self.carvingCornerMinimum = None
-        
+
         # Can we remove this after reading the carving once the layers have been generated??
         self.rotatedLoopLayers = []
-        
+
     def __str__(self):
         '''Get the string representation.'''
         output = StringIO()
-        
+
         output.write("\nRuntimeParameters:\n%s\n" % vars(self.runtimeParameters))
-        
+
         output.write("\nelementOffsets: %s\n" % self.elementOffsets)
-        
+
         output.write("\nrotatedLoopLayers:\n")
         for rotatedLoopLayer in self.rotatedLoopLayers:
             output.write('%s\n' % vars(rotatedLoopLayer))
-            
+
         output.write("\nstartGcodeCommands:\n")
         for startGcodeCommand in self.startGcodeCommands:
             output.write(GcodeCommand.printCommand(startGcodeCommand, self.runtimeParameters.verboseGcode))
-        
+
         output.write("\nlayers:\n")
         for layer in self.layers:
             output.write('%s\n' % layer)
-       
+
         output.write("\nendGcodeCommands:\n")
         for endGcodeCommand in self.endGcodeCommands:
             output.write(GcodeCommand.printCommand(endGcodeCommand, self.runtimeParameters.verboseGcode))
-             
+
         return output.getvalue()
-        
+
     def insertLayers(self, layers, index):
         '''Inserts list of layers at position given by index.'''
 

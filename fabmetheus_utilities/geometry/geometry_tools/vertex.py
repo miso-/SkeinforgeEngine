@@ -14,28 +14,28 @@ __license__ = 'GNU Affero General Public License http://www.gnu.org/licenses/agp
 
 
 def addGeometryList( vertexes, xmlElement ):
-	"Add vertex elements to an xml element."
-	for vertex in vertexes:
-		vertexElement = getUnboundVertexElement(vertex)
-		vertexElement.parentNode = xmlElement
-		xmlElement.childNodes.append( vertexElement )
+    "Add vertex elements to an xml element."
+    for vertex in vertexes:
+        vertexElement = getUnboundVertexElement(vertex)
+        vertexElement.parentNode = xmlElement
+        xmlElement.childNodes.append( vertexElement )
 
 def addVertexToAttributeDictionary(attributeDictionary, vertex):
-	"Add to the attribute dictionary."
-	if vertex.x != 0.0:
-		attributeDictionary['x'] = str(vertex.x)
-	if vertex.y != 0.0:
-		attributeDictionary['y'] = str(vertex.y)
-	if vertex.z != 0.0:
-		attributeDictionary['z'] = str(vertex.z)
+    "Add to the attribute dictionary."
+    if vertex.x != 0.0:
+        attributeDictionary['x'] = str(vertex.x)
+    if vertex.y != 0.0:
+        attributeDictionary['y'] = str(vertex.y)
+    if vertex.z != 0.0:
+        attributeDictionary['z'] = str(vertex.z)
 
 def getUnboundVertexElement(vertex):
-	"Add vertex element to an xml element."
-	vertexElement = xml_simple_reader.XMLElement()
-	addVertexToAttributeDictionary(vertexElement.attributeDictionary, vertex)
-	vertexElement.localName = 'vertex'
-	return vertexElement
+    "Add vertex element to an xml element."
+    vertexElement = xml_simple_reader.XMLElement()
+    addVertexToAttributeDictionary(vertexElement.attributeDictionary, vertex)
+    vertexElement.localName = 'vertex'
+    return vertexElement
 
 def processXMLElement(xmlElement):
-	"Process the xml element."
-	xmlElement.parentNode.xmlObject.vertexes.append(evaluate.getVector3FromXMLElement(xmlElement))
+    "Process the xml element."
+    xmlElement.parentNode.xmlObject.vertexes.append(evaluate.getVector3FromXMLElement(xmlElement))
