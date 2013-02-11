@@ -1,10 +1,17 @@
 from StringIO import StringIO
 from config import config
 from entities import NestedRing, GcodeCommand
+from Placement import Placement
+from fabmetheus_utilities.vector3 import Vector3
 from utilities import memory_tracker
+import logging
 import gcodes
 import sys
 import time
+
+name = 'Layer'
+logger = logging.getLogger(name)
+
 
 class Layer:
     def __init__(self, z, index, runtimeParameters):
@@ -40,16 +47,16 @@ class Layer:
 
         output.write('%2slayer feedAndFlowRateMultiplier:%s\n' % ('', self.feedAndFlowRateMultiplier))
 
-        if self.bridgeRotation != None:
+        if self.bridgeRotation is not None:
             output.write('bridgeRotation: %s \n' % self.bridgeRotation)
 
         output.write('%4spreLayerGcodeCommand:\n' % (''))
         for preLayerGcodeCommand in self.preLayerGcodeCommands:
-            output.write('%4s %s' % ('',GcodeCommand.printCommand(preLayerGcodeCommand, self.runtimeParameters.verboseGcode)))
+            output.write('%4s %s' % ('', GcodeCommand.printCommand(preLayerGcodeCommand, self.runtimeParameters.verboseGcode)))
 
         output.write('%4spreSupportGcodeCommands:\n' % (''))
         for preSupportGcodeCommand in self.preSupportGcodeCommands:
-            output.write('%4s %s' % ('',GcodeCommand.printCommand(preSupportGcodeCommand, self.runtimeParameters.verboseGcode)))
+            output.write('%4s %s' % ('', GcodeCommand.printCommand(preSupportGcodeCommand, self.runtimeParameters.verboseGcode)))
 
         output.write('%4ssupportLayerPaths:\n' % '')
         for supportPath in self.supportPaths:
@@ -57,7 +64,7 @@ class Layer:
 
         output.write('%4spostSupportGcodeCommands:\n' % (''))
         for postSupportGcodeCommand in self.postSupportGcodeCommands:
-            output.write('%4s %s' % ('',GcodeCommand.printCommand(postSupportGcodeCommand, self.runtimeParameters.verboseGcode)))
+            output.write('%4s %s' % ('', GcodeCommand.printCommand(postSupportGcodeCommand, self.runtimeParameters.verboseGcode)))
 
         output.write('%4snestedRings:' % (''))
         for nestedRing in self.nestedRings:
@@ -65,7 +72,7 @@ class Layer:
 
         output.write('\n%4spostLayerGcodeCommand:' % (''))
         for postLayerGcodeCommand in self.postLayerGcodeCommands:
-            output.write('%4s %s' % ('',GcodeCommand.printCommand(postLayerGcodeCommand, self.runtimeParameters.verboseGcode)))
+            output.write('%4s %s' % ('', GcodeCommand.printCommand(postLayerGcodeCommand, self.runtimeParameters.verboseGcode)))
 
         return output.getvalue()
 
@@ -86,14 +93,13 @@ class Layer:
 
         return (distance, duration)
 
-
     def getOrderedPathList(self):
         pathList = []
 
         self.getSupportPaths(pathList)
 
         threadFunctionDictionary = {
-            'infill':self.getInfillPaths, 'loops':self.getLoopPaths, 'perimeter':self.getPerimeterPaths}
+            'infill': self.getInfillPaths, 'loops': self.getLoopPaths, 'perimeter': self.getPerimeterPaths}
         for threadType in self.runtimeParameters.extrusionPrintOrder:
             threadFunctionDictionary[threadType](pathList)
 
@@ -119,8 +125,35 @@ class Layer:
         if len(self.nestedRings) > 0:
             return self.nestedRings[0].getStartPoint()
 
+    def getPlaced(self, placement):
+        '''Returns copy of Layer spatially trasnformed by placement'''
+
+        if placement.rotatesOutOfXYPlane():
+            logger.error('Can\'t rotate Layer out of XY plane! rot = %s' % placement.getRotation())
+            return None
+
+        result = Layer(self.z + placement.displacement.z, self.index, self.runtimeParameters)
+
+        vec = Vector3(placement.displacement.x, placement.displacement.y, 0)
+        newPlacement = Placement(vec, placement.getRotation())
+
+        result.bridgeRotation = self.bridgeRotation  # ?
+
+        for nestedRing in self.nestedRings:
+            result.nestedRings.append(nestedRing.getPlaced(newPlacement))
+
+        result.preLayerGcodeCommands = self.preLayerGcodeCommands
+        result.postLayerGcodeCommands = self.postLayerGcodeCommands
+        result.feedAndFlowRateMultiplier = self.feedAndFlowRateMultiplier
+
+        result.preSupportGcodeCommands = self.preSupportGcodeCommands
+        result.postSupportGcodeCommands = self.postSupportGcodeCommands
+        result.supportPaths = []
+
+        return result
+
     def addNestedRing(self, nestedRing):
         self.nestedRings.append(nestedRing)
 
     def isBridgeLayer(self):
-        return self.bridgeRotation != None
+        return self.bridgeRotation is not None

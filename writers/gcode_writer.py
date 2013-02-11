@@ -8,54 +8,43 @@ import sys
 import time
 import entities.paths as paths
 
+
 class GcodeWriter:
-    '''Writes the slicedModel for a sliced model.'''
+    '''Writes the slicedFile for a sliced model.'''
 
-    def __init__(self, slicedModel):
-        self.slicedModel = slicedModel
+    def __init__(self, slicedFile):
+        self.slicedFile = slicedFile
 
-
-    def getSlicedModel(self, verbose=False):
+    def getSlicedFile(self, verbose=False):
         '''Final Gcode representation.'''
         output = StringIO.StringIO()
 
-        for startCommand in self.slicedModel.startGcodeCommands:
+        for startCommand in self.slicedFile.startGcodeCommands:
             output.write(printCommand(startCommand, verbose))
 
-        lookaheadStartVector = None
-        lookaheadKeyIndex = 0
-        layerCount = len(self.slicedModel.layers)
-        for layer in self.slicedModel.layers:
-            lookaheadStartPoint = None
-            lookaheadIndex = layer.index + 1
-            if lookaheadIndex < layerCount:
-                lookaheadLayer = self.slicedModel.layers[lookaheadIndex]
-                lookaheadStartPoint = lookaheadLayer.getStartPoint()
-                if lookaheadStartPoint != None:
-                    lookaheadStartVector = Vector3(lookaheadStartPoint.real, lookaheadStartPoint.imag, lookaheadLayer.z)
+        self.slicedFile.printbed.rebuildGroupedLayers()
+        for layerGroup in self.slicedFile.printbed.getLayersGroupedByZ():
+            self.getLayerGroup(layerGroup, output, None, verbose)
 
-            self.getLayer(layer, output, lookaheadStartVector, verbose)
-
-        for endCommand in self.slicedModel.endGcodeCommands:
+        for endCommand in self.slicedFile.endGcodeCommands:
             output.write(printCommand(endCommand, verbose))
 
         return output.getvalue()
 
-
-    def getLayer(self, layer, output, parentLookaheadStartVector=None, verbose=False):
+    def getLayerGroup(self, layerGroup, output, parentLookaheadStartVector=None, verbose=False):
         '''Final Gcode representation.'''
-        for preLayerGcodeCommand in layer.preLayerGcodeCommands:
+
+        for preLayerGcodeCommand in layerGroup[0][0].preLayerGcodeCommands:
             output.write(printCommand(preLayerGcodeCommand, verbose))
 
-        if layer.runtimeParameters.combActive:
-            combSkein = CombSkein(layer)
-        else:
-            combSkein = None
+        pathList = []
+        for (layer, instance) in layerGroup:
+            pathList += layer.getOrderedPathList()
 
-        pathList = layer.getOrderedPathList()
         paths.resetExtrusionStats()
 
         pathListCount = len(pathList)
+
         for (index, path) in enumerate(pathList):
             if index + 1 < pathListCount:
                 lookaheadStartPoint = pathList[index + 1].getStartPoint()
@@ -71,6 +60,11 @@ class GcodeWriter:
             nextPoint = path.getStartPoint()
             nextVector = Vector3(nextPoint.real, nextPoint.imag, layer.z)
 
+            if self.slicedFile.runtimeParameters.combActive:
+                combSkein = CombSkein(layer)
+            else:
+                combSkein = None
+
             travelPath = TravelPath(layer.runtimeParameters, previousVector, nextVector, combSkein)
 
             #TODO: We should have used sum of layer.z and containing nestedRing.z as pathheight here,
@@ -80,20 +74,22 @@ class GcodeWriter:
 
             self.getPath(path, layer.z, output, lookaheadVector, layer.feedAndFlowRateMultiplier, verbose)
 
-        for postLayerGcodeCommand in layer.postLayerGcodeCommands:
+        for postLayerGcodeCommand in layerGroup[0][0].postLayerGcodeCommands:
             output.write(printCommand(postLayerGcodeCommand, verbose))
 
     def getPath(self, path, pathHeight, output, lookaheadStartVector=None, feedAndFlowRateMultiplier=[1.0, 1.0], verbose=False):
         '''Final Gcode representation.'''
-        pathExtruder = self.slicedModel.runtimeParameters.extruders[0]
+        pathExtruder = self.slicedFile.runtimeParameters.extruders[0]
 
-        path.generateGcode(pathExtruder, pathHeight, lookaheadStartVector, feedAndFlowRateMultiplier, self.slicedModel.runtimeParameters)
+        path.generateGcode(pathExtruder, pathHeight, lookaheadStartVector, feedAndFlowRateMultiplier, self.slicedFile.runtimeParameters)
 
         for command in path.gcodeCommands:
             output.write('%s' % printCommand(command, verbose))
 
+
 def printCommand(command, verbose=False):
-    if command == None:
+
+    if command is None:
         return
     if isinstance(command, GcodeCommand):
         return'%s\n' % command.str(verbose)

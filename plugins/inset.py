@@ -28,38 +28,45 @@ from utilities import memory_tracker
 logger = logging.getLogger(__name__)
 name = __name__
 
-def performAction(slicedModel):
+
+def performAction(slicedFile):
     "Inset the slicedModel."
 
-    i = InsetSkein(slicedModel)
-    if slicedModel.runtimeParameters.profileMemory:
+    i = InsetSkein(slicedFile)
+    if slicedFile.runtimeParameters.profileMemory:
         memory_tracker.track_object(i)
     i.inset()
 
-    if slicedModel.runtimeParameters.profileMemory:
+    if slicedFile.runtimeParameters.profileMemory:
         memory_tracker.create_snapshot("After inset")
 
-class InsetSkein:
 
+class InsetSkein:
     "A class to inset a skein of extrusions."
-    def __init__(self, slicedModel):
-        self.slicedModel = slicedModel
+
+    def __init__(self, slicedFile):
+        self.slicedFile = slicedFile
         self.overlapRemovalWidthOverPerimeterWidth = config.getfloat(name, 'overlap.removal.scaler')
         self.nozzleDiameter = config.getfloat(name, 'nozzle.diameter')
         self.bridgeWidthMultiplier = config.getfloat(name, 'bridge.width.multiplier.ratio')
         self.loopOrderAscendingArea = config.getboolean(name, 'loop.order.preferloops')
-        self.layerThickness = self.slicedModel.runtimeParameters.layerThickness
-        self.perimeterWidth = self.slicedModel.runtimeParameters.perimeterWidth
+        self.layerThickness = self.slicedFile.runtimeParameters.layerThickness
+        self.perimeterWidth = self.slicedFile.runtimeParameters.perimeterWidth
         self.halfPerimeterWidth = 0.5 * self.perimeterWidth
         self.overlapRemovalWidth = self.perimeterWidth * (0.7853) * self.overlapRemovalWidthOverPerimeterWidth
         self.multiprocess = config.getboolean(name, 'multiprocess')
 
     def inset(self):
+
+        for object in self.slicedFile.getObjectListToSlice():
+            self.insetObject(object)
+
+    def insetObject(self, object):
         "Inset the layers"
 
         if self.multiprocess:
             manager = Manager()
-            sharedLayers = manager.list(self.slicedModel.layers)
+            sharedLayers = manager.list(object.layers)
 
             p = Pool()
             resultLayers = p.map(self.addInsetForLayer, sharedLayers)
@@ -67,16 +74,16 @@ class InsetSkein:
             p.join()
 
             for resultLayer in resultLayers:
-                self.slicedModel.layers[resultLayer.index] = resultLayer
+                object.layers[resultLayer.index] = resultLayer
 
         else:
 
-            for layer in self.slicedModel.layers:
+            for layer in object.layers:
                 self.addInsetForLayer(layer)
 
     def addInsetForLayer(self, layer):
         halfWidth = self.halfPerimeterWidth * 0.7853
-        if layer.bridgeRotation != None:
+        if layer.bridgeRotation is not None:
             halfWidth = self.bridgeWidthMultiplier * ((2 * self.nozzleDiameter - self.layerThickness) / 2) * 0.7853
 
         alreadyFilledArounds = []
@@ -111,7 +118,6 @@ class InsetSkein:
             else:
                 nestedRing.perimeter.addPath(centerOutset.center + [centerOutset.center[0]])
             addAlreadyFilledArounds(alreadyFilledArounds, centerOutset.center, self.overlapRemovalWidth)
-
 
     def addGcodeFromPerimeterPaths(self, nestedRing, isIntersectingSelf, loop, alreadyFilledArounds, halfWidth, boundary):
         "Add the perimeter paths to the output."
@@ -154,6 +160,7 @@ class InsetSkein:
             if euclidean.getPathLength(perimeterPath) > muchGreaterThanRadius:
                 nestedRing.perimeter.addPath(perimeterPath)
 
+
 def addAlreadyFilledArounds(alreadyFilledArounds, loop, radius):
     "Add already filled loops around loop to alreadyFilledArounds."
     radius = abs(radius)
@@ -167,6 +174,7 @@ def addAlreadyFilledArounds(alreadyFilledArounds, loop, radius):
             alreadyFilledLoop.append(alreadyFilledInset)
     if len(alreadyFilledLoop) > 0:
         alreadyFilledArounds.append(alreadyFilledLoop)
+
 
 def addSegmentOutline(isThick, outlines, pointBegin, pointEnd, width):
     "Add a diamond or hexagonal outline for a line segment."
@@ -220,6 +228,7 @@ def addSegmentOutline(isThick, outlines, pointBegin, pointEnd, width):
         outline.append(outsideBeginCenterDown)
     outlines.append(euclidean.getPointsRoundZAxis(normalizedSegment, outline))
 
+
 def getInteriorSegments(loops, segments):
     'Get segments inside the loops.'
     interiorSegments = []
@@ -228,6 +237,7 @@ def getInteriorSegments(loops, segments):
         if euclidean.getIsInFilledRegion(loops, center):
             interiorSegments.append(segment)
     return interiorSegments
+
 
 def getIsIntersectingWithinList(loop, loopList):
     "Determine if the loop is intersecting or is within the loop list."
@@ -265,12 +275,14 @@ def getSegmentsFromLoopListsPoints(loopLists, pointBegin, pointEnd):
             endpoint.point *= normalizedSegment
     return segments
 
+
 def isCloseToLast(paths, point, radius):
     "Determine if the point is close to the last point of the last path."
     if len(paths) < 1:
         return False
     lastPath = paths[-1]
     return abs(lastPath[-1] - point) < radius
+
 
 def isIntersectingItself(loop, width):
     "Determine if the loop is intersecting itself."
@@ -282,6 +294,7 @@ def isIntersectingItself(loop, width):
             return True
         addSegmentOutline(False, outlines, pointBegin, pointEnd, width)
     return False
+
 
 def isIntersectingWithinLists(loop, loopLists):
     "Determine if the loop is intersecting or is within the loop lists."

@@ -5,7 +5,7 @@ Skeins a 3D model into gcode.
 
 from config import config
 from datetime import timedelta
-from entities import SlicedModel, RuntimeParameters
+from entities import RuntimeParameters, File
 from fabmetheus_utilities import archive
 from importlib import import_module
 from utilities import memory_tracker
@@ -82,16 +82,16 @@ def main(argv=None):
 
     logger.info("Processing file: %s", os.path.basename(inputFilename))
 
-    exportedSlicedModelExtension = config.get('export', 'export.slicedmodel.extension')
-    if inputFilename.endswith(exportedSlicedModelExtension):
-        slicedModel = pickle.load(open(inputFilename))
-        slicedModel.runtimeParameters = RuntimeParameters()
-        inputFilename = inputFilename.replace('.'+exportedSlicedModelExtension, '')
+    exportedSlicedFileExtension = config.get('export', 'export.slicedfile.extension')
+    if inputFilename.endswith(exportedSlicedFileExtension):
+        slicedFile = pickle.load(open(inputFilename))
+        slicedFile.runtimeParameters = RuntimeParameters()
+        inputFilename = inputFilename.replace('.' + exportedSlicedFileExtension, '')
     else:
-        slicedModel = SlicedModel()
+        slicedFile = File(inputFilename)
 
     if args.o != None:
-        slicedModel.runtimeParameters.outputFilename = args.o
+        slicedFile.runtimeParameters.outputFilename = args.o
 
     if args.r != None:
         pluginSequence = args.r.split(',')
@@ -100,28 +100,28 @@ def main(argv=None):
     else:
         pluginSequence = config.get('general', 'plugin.sequence').split(',')
 
-    if inputFilename.endswith(exportedSlicedModelExtension) and 'carve' in pluginSequence:
+    if inputFilename.endswith(exportedSlicedFileExtension) and 'carve' in pluginSequence:
         logger.error('Reprocessing a sliced model file with carve is not possible. Please process the original file or choose a different reprocessing sequence.')
         return
 
     logger.debug("Plugin Sequence: %s", pluginSequence)
 
-    if slicedModel.runtimeParameters.profileMemory:
-        memory_tracker.track_object(slicedModel)
+    if slicedFile.runtimeParameters.profileMemory:
+        memory_tracker.track_object(slicedFile)
         memory_tracker.create_snapshot('Start')
 
-    slicedModel.runtimeParameters.profileName = profileName
-    slicedModel.runtimeParameters.inputFilename = inputFilename
+    slicedFile.runtimeParameters.profileName = profileName
+    slicedFile.runtimeParameters.inputFilename = inputFilename
 
-    setupExtruders(slicedModel)
+    setupExtruders(slicedFile)
 
-    getCraftedTextFromPlugins(pluginSequence[:], slicedModel)
+    getCraftedTextFromPlugins(pluginSequence[:], slicedFile)
 
-    slicedModel.runtimeParameters.endTime = time.time()
+    slicedFile.runtimeParameters.endTime = time.time()
 
-    logger.info('It took %s seconds to complete.', timedelta(seconds=slicedModel.runtimeParameters.endTime - slicedModel.runtimeParameters.startTime).total_seconds())
+    logger.info('It took %s seconds to complete.', timedelta(seconds=slicedFile.runtimeParameters.endTime - slicedFile.runtimeParameters.startTime).total_seconds())
 
-    if slicedModel.runtimeParameters.profileMemory:
+    if slicedFile.runtimeParameters.profileMemory:
         memory_tracker.create_snapshot('End')
         if config.getboolean('general', 'profile.memory.print.summary'):
             memory_tracker.tracker.stats.print_summary()
@@ -131,7 +131,7 @@ def main(argv=None):
             from pympler.classtracker_stats import HtmlStats
             HtmlStats(tracker=memory_tracker.tracker).create_html('%s.memory_tracker.html' % inputFilename)
 
-    return slicedModel
+    return slicedFile
 
 def handleError(self, record):
     traceback.print_stack()

@@ -12,31 +12,73 @@ License:
 
 from config import config
 from fabmetheus_utilities import archive, svg_writer, vector3
+from entities import Placement
+from importlib import import_module
 import logging
+import os
+import sys
 import math
 
 name = 'carve'
 logger = logging.getLogger(name)
 
+__interpret_plugins_path__ = 'fabmetheus_utilities/fabmetheus_tools/interpret_plugins'
 
-def performAction(slicedModel):
+
+def performAction(slicedFile):
     "Get carved text."
-    filename = slicedModel.runtimeParameters.inputFilename
-    carving = svg_writer.getCarving(filename)
-    if carving == None:
-        return
+    fileExtension = os.path.splitext(slicedFile.fileName)[1][1:].lower()
+    sys.path.insert(0, __interpret_plugins_path__)
+    pluginModule = import_module(fileExtension)
+    if pluginModule is None:
+        return None
+    pluginModule.getCarving(slicedFile)
+
+    slicedFile.getObjectListToSlice()
+    preparePrintbed(slicedFile)
+
     if config.getboolean(name, 'debug'):
-        carvingFilename = filename[: filename.rfind('.')] + '.carving.xml'
-        archive.writeFileText(carvingFilename , str(carving))
-        logger.info("Carving XML written to %s", carvingFilename)
-    CarveSkein(slicedModel).carve(carving)
+        for object in slicedFile.getObjectListToSlice():
+            carvingFilename = slicedFile.fileName[: slicedFile.fileName.rfind('.')] + '_' + str(object.objectId) + '.carving.xml'
+            archive.writeFileText(carvingFilename, str(object.triangleMesh))
+            logger.info("Carving XML written to %s", carvingFilename)
+    CarveSkein(slicedFile).carve()
+
+
+def preparePrintbed(slicedFile):
+
+    derivedObjects = []
+
+    for instance in slicedFile.printbed.instances:
+        object = instance.object
+        placement = instance.placement
+        shiftZ = placement.displacement.z
+
+        if placement.rotatesOutOfXYPlane() or shiftZ % slicedFile.runtimeParameters.layerHeight != 0:
+
+            success = False
+            for derObj in derivedObjects:
+                if object == derObj.derivedFrom.object:
+                    placementDiff = placement / derObj.derivedFrom.placement
+                    if not placementDiff.rotatesOutOfXYPlane() and not placementDiff.displacement.z % slicedFile.runtimeParameters.layerHeight:
+                        instance.object = derObj
+                        instance.placement = placementDiff
+                        success = True
+                        break
+
+            if not success:
+                derivedObject = instance.object.getDerivedObject(instance.placement)
+                instance.object = derivedObject
+                instance.placement = Placement()
+                derivedObjects.append(derivedObject)
+
 
 class CarveSkein:
     "A class to carve a 3D model."
 
-    def __init__(self, slicedModel):
+    def __init__(self, slicedFile):
         'Initialize'
-        self.slicedModel = slicedModel
+        self.slicedFile = slicedFile
         self.layerHeight = config.getfloat(name, 'layer.height')
         self.extrusionWidth = config.getfloat(name, 'extrusion.width')
         self.infillBridgeDirection = config.getboolean(name, 'infill.bridge.direction')
@@ -46,9 +88,15 @@ class CarveSkein:
         self.layerPrintFrom = config.getint(name, 'layer.print.from')
         self.layerPrintTo = config.getint(name, 'layer.print.to')
 
-    def carve(self, carving):
-        "Parse 3D model file and store the carved slicedModel."
+    def carve(self):
 
+        for object in self.slicedFile.getObjectListToSlice():
+            self.carveObject(object)
+
+    def carveObject(self, object):
+        "Parse 3D model file and store the carved slicedFile."
+
+        carving = object.triangleMesh
         carving.setCarveInfillInDirectionOfBridge(self.infillBridgeDirection)
         carving.setCarveLayerThickness(self.layerHeight)
         importRadius = 0.5 * self.importCoarsenessRatio * abs(self.extrusionWidth)
@@ -61,10 +109,10 @@ class CarveSkein:
             logger.warning('There are no slices for the model, this could be because the model is too small for the Layer Thickness.')
             return
 
-        self.slicedModel.carvingCornerMaximum = carving.getCarveCornerMaximum()
-        self.slicedModel.carvingCornerMinimum = carving.getCarveCornerMinimum()
+        object.carvingCornerMaximum = carving.getCarveCornerMaximum()
+        object.carvingCornerMinimum = carving.getCarveCornerMinimum()
 
-        toBePrintedLayers = rotatedLoopLayers[self.layerPrintFrom : self.layerPrintTo]
+        toBePrintedLayers = rotatedLoopLayers[self.layerPrintFrom: self.layerPrintTo]
         for toBePrintedLayer in toBePrintedLayers:
             sortedLoops = []
             for toBePrintedLayerLoop in toBePrintedLayer.loops:
@@ -73,19 +121,18 @@ class CarveSkein:
                 sortedLoops.append(toBePrintedLayerLoop[lowerLeftIndex:] + toBePrintedLayerLoop[:lowerLeftIndex])
             toBePrintedLayer.loops = sortedLoops
 
-        self.slicedModel.rotatedLoopLayers = toBePrintedLayers
+        object.rotatedLoopLayers = toBePrintedLayers
 
         if config.getboolean(name, 'debug'):
-            filename = self.slicedModel.runtimeParameters.inputFilename
-            svgFilename = filename[: filename.rfind('.')] + '.svg'
-            svgWriter = svg_writer.SVGWriter(
-                    True,
-                    self.slicedModel.carvingCornerMaximum,
-                    self.slicedModel.carvingCornerMinimum,
-                    self.slicedModel.runtimeParameters.decimalPlaces,
-                    self.slicedModel.runtimeParameters.layerHeight,
-                    self.slicedModel.runtimeParameters.layerThickness)
-            archive.writeFileText(svgFilename , svgWriter.getReplacedSVGTemplate(self.slicedModel.runtimeParameters.inputFilename, '', self.slicedModel.rotatedLoopLayers))
+            filename = self.slicedFile.fileName
+            svgFilename = filename[: filename.rfind('.')] + '_' + str(object.objectId) + '.svg'
+            svgWriter = svg_writer.SVGWriter(True,
+                                             object.carvingCornerMaximum,
+                                             object.carvingCornerMinimum,
+                                             self.slicedFile.runtimeParameters.decimalPlaces,
+                                             self.slicedFile.runtimeParameters.layerHeight,
+                                             self.slicedFile.runtimeParameters.layerThickness)
+            archive.writeFileText(svgFilename, svgWriter.getReplacedSVGTemplate(filename + str(object.objectId), '', object.rotatedLoopLayers))
             logger.info("Carving SVG written to %s", svgFilename)
 
     def getLowerLeftCorner(self, points):

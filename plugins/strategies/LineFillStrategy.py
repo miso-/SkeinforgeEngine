@@ -18,14 +18,17 @@ import math
 import sys
 from utilities import memory_tracker
 
-def getStrategy(slicedModel):
+
+def getStrategy(slicedFile):
     '''Returns an instance of the strategy'''
-    return LineFillStrategy(slicedModel)
+    return LineFillStrategy(slicedFile)
+
 
 class LineFillStrategy:
-    def __init__(self, slicedModel):
+
+    def __init__(self, slicedFile):
         # TODO - remove or reduce dependency on slicedModel
-        self.slicedModel = slicedModel
+        self.slicedFile = slicedFile
 
         self.infillSolidity = config.getfloat('fill', 'infill.solidity.ratio')
         self.infillWidthOverThickness = config.getfloat('fill', 'extrusion.lines.extra.spacer.scaler')
@@ -50,8 +53,9 @@ class LineFillStrategy:
         self.previousExtraShells = -1
         self.oldOrderedLocation = None
 
-    def fill(self, layer):
+    def fill(self, layer, object):
         'Add fill to the carve layer.'
+        self.object = object
         layerIndex = layer.index
         alreadyFilledArounds = []
         pixelTable = {}
@@ -171,10 +175,10 @@ class LineFillStrategy:
     def addRotatedCarve(self, currentLayer, layerDelta, reverseRotation, surroundingCarves):
         'Add a rotated carve to the surrounding carves.'
         layerIndex = currentLayer + layerDelta
-        if layerIndex < 0 or layerIndex >= len(self.slicedModel.layers):
+        if layerIndex < 0 or layerIndex >= len(self.object.layers):
             return
 
-        layer = self.slicedModel.layers[layerIndex]
+        layer = self.object.layers[layerIndex]
 
         nestedRings = layer.nestedRings
         rotatedCarve = []

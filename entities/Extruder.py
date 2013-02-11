@@ -3,17 +3,20 @@ from config import config
 from math import pi
 import gcodes
 
-def setupExtruders(slicedModel):
-    slicedModel.runtimeParameters.extruders = []
+
+def setupExtruders(slicedFile):
+
+    slicedFile.runtimeParameters.extruders = []
 
     extruderSections = []
 
     for section in config.sections():
         if section.startswith('Extruder'):
-            slicedModel.runtimeParameters.extruders.append(Extruder(slicedModel.runtimeParameters, section))
+            slicedFile.runtimeParameters.extruders.append(Extruder(slicedFile.runtimeParameters, section))
 
 
 class Extruder:
+
     def __init__(self, runtimeParameters, section):
         self.extrussionDistance = 0
         self.lastRetractDistance = 0
@@ -34,7 +37,7 @@ class Extruder:
         self.filamentDiameter = config.getfloat(section, 'filament.diameter')
         self.filamentPackingDensity = config.getfloat(section, 'filament.packing.density')
         self.oozeRate = config.getfloat(section, 'oozerate')
-        self.extruderRetractionSpeedMinute  = round(60.0 * config.getfloat(section, 'retraction.speed'), self.dimensionDecimalPlaces)
+        self.extruderRetractionSpeedMinute = round(60.0 * config.getfloat(section, 'retraction.speed'), self.dimensionDecimalPlaces)
         self.maximumRetractionDistance = config.getfloat(section, 'maximum.retraction')
         self.axisCode = config.get(section, 'axis.code')
 
@@ -43,7 +46,6 @@ class Extruder:
         extrusionArea = pi * self.layerThickness ** 2 / 4 + self.layerThickness * (self.perimeterWidth - self.layerThickness)
             #http://hydraraptor.blogspot.sk/2011/03/spot-on-flow-rate.html
         self.flowScaleSixty = 60.0 * extrusionArea / filamentPackingArea
-
 
     def getExtrusionDistance(self, distance, flowRate, feedRateMinute):
 
@@ -59,7 +61,6 @@ class Extruder:
             extrusionDistance = round(self.extrussionDistance, self.dimensionDecimalPlaces)
 
         return extrusionDistance
-
 
     def getRetractCommands(self, idleTime, resumingSpeed):
 
@@ -80,7 +81,6 @@ class Extruder:
 
         return commands
 
-
     def getRetractReverseCommands(self):
 
         commands = []
@@ -99,7 +99,6 @@ class Extruder:
             commands.append(self.getResetExtruderDistanceCommand())
 
         return commands
-
 
     def getResetExtruderDistanceCommand(self):
 

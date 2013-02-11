@@ -4,18 +4,24 @@ from config import config
 from fabmetheus_utilities.vector3 import Vector3
 from math import pi
 from utilities import memory_tracker
+import logging
 import gcodes
 import math
 import sys
 import time
 
+name = 'paths'
+logger = logging.getLogger(name)
+
 # globals used as an easy way to maintain state between layer changes
 _totalExtrusionDistance = 0.0
 _previousPoint = None
 
+
 def resetExtrusionStats():
     global _previousPoint
     _previousPoint = None
+
 
 class Path:
     ''' A Path the tool will follow within a nested ring.'''
@@ -106,15 +112,67 @@ class Path:
         '''Allows subclasses to override the relevant flowrate method so we don't have to use large if statements.'''
         return self.flowRate
 
+    def getPlaced(self, placement):
+        '''Returns spatially transformed copy of self'''
+
+        if placement.rotatesOutOfXYPlane():
+            logger.error('Can\'t rotate Path out of XY plane! rot = % s' % placement.getRotation())
+            return None
+
+        result = Path(self.getParameters(), self.z + placement.displacement.z)
+
+        result.type = self.type
+
+        result.startPoint = placement.getPlaced(self.startPoint)
+
+        for point in self.points:
+            result.points.append(placement.getPlaced(point))
+
+        return result
+
+    def getParameters(self):
+
+        runtimeParameters = Parameters()
+
+        runtimeParameters.decimalPlaces = self.decimalPlaces
+        runtimeParameters.dimensionDecimalPlaces = self.dimensionDecimalPlaces
+        runtimeParameters.speedActive = self.speedActive
+        runtimeParameters.bridgeFeedRateMinute = self.bridgeFeedRateMinute
+        runtimeParameters.perimeterFeedRateMinute = self.perimeterFeedRateMinute
+        runtimeParameters.extrusionFeedRateMinute = self.extrusionFeedRateMinute
+        runtimeParameters.travelFeedRateMinute = self.travelFeedRateMinute
+        runtimeParameters.extrusionUnitsRelative = self.extrusionUnitsRelative
+        runtimeParameters.supportFeedRateMinute = self.supportFeedRateMinute
+
+        runtimeParameters.dimensionActive = self.dimensionActive
+
+        runtimeParameters.zDistanceRatio = self.zDistanceRatio
+
+        runtimeParameters.layerThickness = self.layerThickness
+        runtimeParameters.perimeterWidth = self.perimeterWidth
+        runtimeParameters.absolutePositioning = self.absolutePositioning
+        runtimeParameters.flowRate = self.flowRate
+        runtimeParameters.perimeterFlowRate = self.perimeterFlowRate
+        runtimeParameters.bridgeFlowRate = self.bridgeFlowRate
+        runtimeParameters.combActive = self.combActive
+
+        runtimeParameters.minimumBridgeFeedRateMultiplier = self.minimumBridgeFeedRateMultiplier
+        runtimeParameters.minimumPerimeterFeedRateMultiplier = self.minimumPerimeterFeedRateMultiplier
+        runtimeParameters.minimumExtrusionFeedRateMultiplier = self.minimumExtrusionFeedRateMultiplier
+        runtimeParameters.minimumTravelFeedRateMultiplier = self.minimumTravelFeedRateMultiplier
+        runtimeParameters.minimumLayerFeedRateMinute = self.minimumLayerFeedRateMinute
+
+        return runtimeParameters
+
     def generateGcode(self, extruder, height, lookaheadStartVector=None, feedAndFlowRateMultiplier=[1.0, 1.0], runtimeParameters=None):
         'Transforms paths and points to gcode'
         global _previousPoint
         self.gcodeCommands = []
 
-        if runtimeParameters != None:
+        if runtimeParameters is not None:
             self._setParameters(runtimeParameters)
 
-        if _previousPoint == None:
+        if _previousPoint is None:
             _previousPoint = self.startPoint
 
         for point in self.points:
@@ -149,9 +207,8 @@ class Path:
         else:
             return (feedRateMinute * feedRateMultiplier, feedRateMultiplier)
 
-
     def offset(self, offset):
-        if self.startPoint != None:
+        if self.startPoint is not None:
             self.startPoint = complex(self.startPoint.real + offset.real, self.startPoint.imag + offset.imag)
         for (index, point) in enumerate(self.points):
             self.points[index] = complex(point.real + offset.real, point.imag + offset.imag)
@@ -160,26 +217,89 @@ class Path:
         'Add a path to the output.'
         if len(path) > 0:
             self.startPoint = path[0]
-            self.points = path[1 :]
+            self.points = path[1:]
         else:
             logger.warning('Zero length vertex positions array which was skipped over, this should never happen.')
         if len(path) < 2:
             logger.warning('Path of only one point: %s, this should never happen.', path)
 
+
 class Loop(Path):
+
     def __init__(self, runtimeParameters, z=0):
         Path.__init__(self, runtimeParameters, z)
+
+    def getPlaced(self, placement):
+        '''Returns spatially transformed copy of self'''
+
+        if placement.rotatesOutOfXYPlane():
+            logger.error('Can\'t rotate Loop out of XY plane! rot = %s' % placement.getRotation())
+            return None
+
+        result = Loop(self.getParameters(), self.z + placement.displacement.z)
+
+        result.type = self.type
+
+        result.startPoint = placement.getPlaced(self.startPoint)
+
+        for point in self.points:
+            result.points.append(placement.getPlaced(point))
+
+        return result
+
 
 class InfillPath(Path):
+
     def __init__(self, runtimeParameters, z=0):
         Path.__init__(self, runtimeParameters, z)
 
+    def getPlaced(self, placement):
+        '''Returns spatially transformed copy of self'''
+
+        if placement.rotatesOutOfXYPlane():
+            logger.error('Can\'t rotate InfillPath out of XY plane! rot = %s' % placement.getRotation())
+            return None
+
+        parameters = self.getParameters()
+        result = InfillPath(parameters, self.z + placement.displacement.z)
+
+        result.type = self.type
+
+        result.startPoint = placement.getPlaced(self.startPoint)
+
+        for point in self.points:
+            result.points.append(placement.getPlaced(point))
+
+        return result
+
+
 class SupportPath(Path):
+
     def __init__(self, runtimeParameters, z=0):
         Path.__init__(self, runtimeParameters, z)
 
     def getFeedRateMinute(self):
         return self.supportFeedRateMinute
+
+    def getPlaced(self, placement):
+        '''Returns spatially transformed copy of self'''
+
+        if placement.rotatesOutOfXYPlane():
+            logger.error('Can\'t rotate SupportPath out of XY plane! rot = %s' % placement.getRotation())
+            return None
+
+        parameters = self.getParameters()
+        result = SupportPath(parameters, self.z + placement.displacement.z)
+
+        result.type = self.type
+
+        result.startPoint = placement.getPlaced(self.startPoint)
+
+        for point in self.points:
+            result.points.append(placement.getPlaced(point))
+
+        return result
+
 
 class TravelPath(Path):
     '''Moves from one path to another without extruding. Optionally dodges gaps (comb) and retracts (dimension)'''
@@ -190,7 +310,7 @@ class TravelPath(Path):
         self.toLocation = toLocation
         self.combSkein = combSkein
 
-        if fromLocation != None:
+        if fromLocation is not None:
             self.startPoint = fromLocation.dropAxis()
         else:
             self.startPoint = toLocation.dropAxis()
@@ -218,7 +338,7 @@ class TravelPath(Path):
         startPointPath = []
         global _previousPoint
 
-        if self.combActive and self.fromLocation != None and self.combSkein != None:
+        if self.combActive and self.fromLocation is not None and self.combSkein is not None:
 
             additionalCommands = self.combSkein.getPathsBetween(self.z + height, self.fromLocation.dropAxis(), self.toLocation.dropAxis())
             startPointPath.extend(additionalCommands)
@@ -227,8 +347,8 @@ class TravelPath(Path):
 
         for point in startPointPath:
             gcodeArgs = [('X', round(point.real, self.decimalPlaces)),
-                ('Y', round(point.imag, self.decimalPlaces)),
-                ('Z', round(self.z + height, self.decimalPlaces))]
+                         ('Y', round(point.imag, self.decimalPlaces)),
+                         ('Z', round(self.z + height, self.decimalPlaces))]
 
             if self.speedActive:
                 travelFeedRateMinute, travelFeedRateMultiplier = self.getFeedRateAndMultiplier(self.travelFeedRateMinute, feedAndFlowRateMultiplier)
@@ -245,15 +365,15 @@ class TravelPath(Path):
         'Transforms paths and points to gcode'
         global _previousPoint
 
-        if runtimeParameters != None:
+        if runtimeParameters is not None:
             self._setParameters(runtimeParameters)
 
-        if _previousPoint == None:
+        if _previousPoint is None:
             _previousPoint = self.startPoint
 
         if self.dimensionActive:
 
-            if self.fromLocation != None:
+            if self.fromLocation is not None:
 
                 locationMinusOld = self.toLocation - self.fromLocation
                 xyTravel = abs(locationMinusOld.dropAxis())
@@ -263,7 +383,6 @@ class TravelPath(Path):
                 timeToNextThread = 0.0
 
             self.gcodeCommands.extend(pathExtruder.getRetractCommands(timeToNextThread, self.getFeedRateMinute()))
-
 
         self.gcodeCommands.append(GcodeCommand(gcodes.TURN_EXTRUDER_OFF))
 
@@ -275,9 +394,27 @@ class TravelPath(Path):
 
         self.gcodeCommands.append(GcodeCommand(gcodes.TURN_EXTRUDER_ON))
 
-
     def getFeedRateMinute(self):
         return self.travelFeedRateMinute
+
+    def getPlaced(self, placement):
+
+        if placement.rotatesOutOfXYPlane():
+            logger.error('Can\'t rotate TravelPath out of XY plane! rot = %s' % placement.getRotation())
+            return None
+
+        parameters = self.getParameters()
+        result = TravelPath(parameters, placement.getPlaced(self.fromLocation), placement.getPlaced(self.toLocation), self.combSkein, self.z + placement.displacement.z)
+
+        result.type = self.type
+
+        result.startPoint = placement.getPlaced(self.startPoint)
+
+        for point in self.points:
+            result.points.append(placement.getPlaced(point))
+
+        return result
+
 
 class BoundaryPerimeter(Path):
 
@@ -303,3 +440,29 @@ class BoundaryPerimeter(Path):
 
     def getFlowRate(self):
         return self.perimeterFlowRate
+
+    def getPlaced(self, placement):
+
+        if placement.rotatesOutOfXYPlane():
+            logger.error('Can\'t rotate BoundaryPerimeter out of XY plane! rot = %s' % placement.getRotation())
+            return None
+
+        parameters = self.getParameters()
+        result = BoundaryPerimeter(parameters, self.z + placement.displacement.z)
+
+        for boundaryPoint in self.boundaryPoints:
+            result.boundaryPoints.append(placement.getPlaced(boundaryPoint))
+
+        result.type = self.type
+
+        result.startPoint = placement.getPlaced(self.startPoint)
+
+        for point in self.points:
+            result.points.append(placement.getPlaced(point))
+
+        return result
+
+
+class Parameters:
+    def __init__(self):
+        return

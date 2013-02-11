@@ -23,15 +23,15 @@ globalOriginalTextString = '<!-- Original XML Text:\n'
 
 __interpret_plugins_path__ = 'fabmetheus_utilities/fabmetheus_tools/interpret_plugins'
 
-def getCarving(fileName):
+def getCarving(slicedFile):
     'Get a carving for the file using an import plugin.'
 
-    fileExtension = os.path.splitext(fileName)[1][1:].lower()
+    fileExtension = os.path.splitext(slicedFile.fileName)[1][1:].lower()
     sys.path.insert(0, __interpret_plugins_path__)
     pluginModule = import_module(fileExtension)
     if pluginModule == None:
         return None
-    return pluginModule.getCarving(fileName)
+    return pluginModule.getCarving(slicedFile)
 
 def getCommentElement(xmlElement):
     'Get a carving for the file using an import plugin.'

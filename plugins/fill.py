@@ -20,30 +20,33 @@ import sys
 logger = logging.getLogger(__name__)
 name = __name__
 
-def performAction(slicedModel):
+
+def performAction(slicedFile):
     'Fills the perimeters.'
     if not config.getboolean(name, 'active'):
         logger.info("%s plugin is inactive", name.capitalize())
         return
 
-    f = FillSkein(slicedModel)
-    if slicedModel.runtimeParameters.profileMemory:
+    f = FillSkein(slicedFile)
+    if slicedFile.runtimeParameters.profileMemory:
         memory_tracker.track_object(f)
     f.fill()
-    if slicedModel.runtimeParameters.profileMemory:
+    if slicedFile.runtimeParameters.profileMemory:
         memory_tracker.create_snapshot("After fill")
+
 
 class FillSkein:
     'A class to fill a skein of extrusions.'
-    def __init__(self, slicedModel):
-        self.slicedModel = slicedModel
+
+    def __init__(self, slicedFile):
+        self.slicedFile = slicedFile
         self.extrusionWidth = config.getfloat('carve', 'extrusion.width')
         self.fillStrategyName = config.get(name, 'strategy')
         self.fillStrategyPath = config.get(name, 'strategy.path')
 
     def fill(self):
         'Fills the layers.'
-        if self.extrusionWidth == None:
+        if self.extrusionWidth is None:
             logger.warning('Nothing will be done because extrusion width FillSkein is None.')
             return
 
@@ -51,14 +54,14 @@ class FillSkein:
         try:
             if self.fillStrategyPath not in sys.path:
                 sys.path.insert(0, self.fillStrategyPath)
-            fillStrategy = import_module(self.fillStrategyName).getStrategy(self.slicedModel)
+            fillStrategy = import_module(self.fillStrategyName).getStrategy(self.slicedFile)
             logger.info("Using fill strategy: %s", self.fillStrategyName)
         except ImportError:
             logger.warning("Could not find module for fill strategy called: %s", self.fillStrategyName)
         except Exception as inst:
             logger.warning("Exception reading strategy %s: %s", self.fillStrategyName, inst)
 
-        for layer in self.slicedModel.layers:
-
-            if fillStrategy != None:
-                fillStrategy.fill(layer)
+        for object in self.slicedFile.getObjectListToSlice():
+            for layer in object.layers:
+                if fillStrategy is not None:
+                    fillStrategy.fill(layer, object)

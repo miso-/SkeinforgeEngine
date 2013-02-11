@@ -21,39 +21,46 @@ import os
 name = __name__
 logger = logging.getLogger(name)
 
-def performAction(slicedModel):
+
+def performAction(slicedFile):
     "Preface and converts the layers."
-    PrefaceSkein(slicedModel).preface()
+    PrefaceSkein(slicedFile).preface()
+
 
 class PrefaceSkein:
     "A class to preface a skein of extrusions."
-    def __init__(self, slicedModel):
-        self.slicedModel = slicedModel
+
+    def __init__(self, slicedFile):
+        self.slicedFile = slicedFile
         self.setPositioningToAbsolute = config.getboolean(name, 'positioning.absolute')
         self.setUnitsToMillimeters = config.getboolean(name, 'units.millimeters')
         self.startAtHome = config.getboolean(name, 'startup.at.home')
         self.resetExtruder = config.getboolean(name, 'startup.extruder.reset')
         self.endFile = config.get(name, 'end.file')
         self.startFile = config.get(name, 'start.file')
-        self.layerHeight = self.slicedModel.runtimeParameters.layerHeight
+        self.layerHeight = self.slicedFile.runtimeParameters.layerHeight
 
     def preface(self):
         "Prefaces and converts the svg text to Gcode."
 
         self.addStartCommandsToGcode()
 
-        for (index, rotatedLoopLayer) in enumerate(self.slicedModel.rotatedLoopLayers):
-            self.addPrefaceToGcode(index, rotatedLoopLayer)
+        for object in self.slicedFile.getObjectListToSlice():
+            self.prefaceObject(object)
 
         self.addEndCommandsToGcode()
 
+    def prefaceObject(self, object):
 
-    def addPrefaceToGcode(self, index, rotatedLoopLayer):
-        decimalPlaces = self.slicedModel.runtimeParameters.decimalPlaces
+        for (index, rotatedLoopLayer) in enumerate(object.rotatedLoopLayers):
+            self.addPrefaceToGcode(index, rotatedLoopLayer, object)
+
+    def addPrefaceToGcode(self, index, rotatedLoopLayer, object):
+        decimalPlaces = self.slicedFile.runtimeParameters.decimalPlaces
 
         # adding 0.5*layerHeight is needed to get layer[0].z == layerHeight
         z = round(rotatedLoopLayer.z + (self.layerHeight * 0.5), 3)
-        layer = Layer(z, index, self.slicedModel.runtimeParameters)
+        layer = Layer(z, index, self.slicedFile.runtimeParameters)
 
         if rotatedLoopLayer.rotation != None:
             layer.bridgeRotation = complex(rotatedLoopLayer.rotation)
@@ -63,7 +70,7 @@ class PrefaceSkein:
 
         nestRingPlaceholder = {}
         for loop in loops:
-            nestedRing = NestedRing(self.slicedModel.runtimeParameters)
+            nestedRing = NestedRing(self.slicedFile.runtimeParameters)
             nestedRing.setBoundaryPerimeter(loop)
             nestRingPlaceholder[str(loop)] = nestedRing
 
@@ -78,7 +85,7 @@ class PrefaceSkein:
                 parentNestedRing = nestRingPlaceholder[str(internalLoops[internalLoop])]
                 parentNestedRing.innerNestedRings.append(childNestedRing)
 
-        self.slicedModel.layers.append(layer)
+        object.layers.append(layer)
 
     def createLoopHierarchy(self, loops):
         internalLoops = {}
@@ -96,18 +103,18 @@ class PrefaceSkein:
     def addStartCommandsToGcode(self):
         if config.get(name, 'start.file') != None:
             for line in archive.getLinesFromAlterationsFile(self.startFile):
-                self.slicedModel.startGcodeCommands.append(line)
+                self.slicedFile.startGcodeCommands.append(line)
 
         if self.setPositioningToAbsolute:
-            self.slicedModel.startGcodeCommands.append(GcodeCommand(gcodes.ABSOLUTE_POSITIONING))
+            self.slicedFile.startGcodeCommands.append(GcodeCommand(gcodes.ABSOLUTE_POSITIONING))
         if self.setUnitsToMillimeters:
-            self.slicedModel.startGcodeCommands.append(GcodeCommand(gcodes.UNITS_IN_MILLIMETERS))
+            self.slicedFile.startGcodeCommands.append(GcodeCommand(gcodes.UNITS_IN_MILLIMETERS))
         if self.startAtHome:
-            self.slicedModel.startGcodeCommands.append(GcodeCommand(gcodes.START_AT_HOME))
+            self.slicedFile.startGcodeCommands.append(GcodeCommand(gcodes.START_AT_HOME))
         if self.resetExtruder:
-            self.slicedModel.startGcodeCommands.append(GcodeCommand(gcodes.RESET_EXTRUDER_DISTANCE, [('E', '0')]))
+            self.slicedFile.startGcodeCommands.append(GcodeCommand(gcodes.RESET_EXTRUDER_DISTANCE, [('E', '0')]))
 
     def addEndCommandsToGcode(self):
         if config.get(name, 'end.file') != None:
             for line in archive.getLinesFromAlterationsFile(self.endFile):
-                self.slicedModel.endGcodeCommands.append(line)
+                self.slicedFile.endGcodeCommands.append(line)

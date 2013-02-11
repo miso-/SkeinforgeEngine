@@ -7,9 +7,9 @@ delete.comments=true
 file.extension=gcode
 file.extension.profile=true
 replace.filename=replace.csv
-export.slicedmodel=true
-export.slicedmodel.extension=slicedmodel.pickle
-overwrite.exported.slicedmodel=true
+export.slicedfile=true
+export.slicedfile.extension=slicedfile.pickle
+overwrite.exported.slicedfile=true
 
 
 [preface]
