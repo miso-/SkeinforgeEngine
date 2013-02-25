@@ -5,6 +5,8 @@ from fabmetheus_utilities import archive
 from entities import File, Object, Constellation, Instance, Placement
 from struct import unpack
 import xml.etree.ElementTree as ET
+from math import sqrt
+from config import config
 
 
 __license__ = 'GNU Affero General Public License http://www.gnu.org/licenses/agpl.html'
@@ -128,13 +130,35 @@ def parseObject(objectNode):
     metadata = MetaData(objectNode.findall('metadata'))
     triangleMesh = triangle_mesh.TriangleMesh()
 
-    triangleMesh.vertexes = parseVertices(objectNode.findall('mesh/vertices/vertex'))
+    vertices = parseVertices(objectNode.findall('mesh/vertices/vertex'))
+    parseEdges(objectNode.findall('mesh/vertices/edge'), vertices)
     volumes = parseVolumes(objectNode.findall('mesh/volume'))
 
     for volume in volumes:
+        curvedTriangles = []
+        plainTriangles = []
         for triangleFace in volume.triangleFaces:
-            triangleFace.index = len(triangleMesh.faces)
-            triangleMesh.faces.append(triangleFace)
+            if isCurvedTriange(triangleFace, vertices):
+                curvedTriangles.append(triangleFace)
+            else:
+                plainTriangles.append(triangleFace)
+
+        for triangleFace in curvedTriangles:
+            triangles = divideTriangle(triangleFace, vertices, config.getint('export', 'amf.curved.triangles.subdivision.depth'))
+            for triangle in triangles:
+                triangle.index = len(triangleMesh.faces)
+                triangleMesh.faces.append(triangle)
+
+        for triangleFace in plainTriangles:
+            if config.getint('export', 'amf.curved.triangles.subdivision.depth') >= 0:
+                for triangle in retesselate(triangleFace, vertices):
+                    triangle.index = len(triangleMesh.faces)
+                    triangleMesh.faces.append(triangle)
+            else:
+                triangleFace.index = len(triangleMesh.faces)
+                triangleMesh.faces.append(triangleFace)
+
+    triangleMesh.vertexes = [vertex.coordinates for vertex in vertices]
 
     return Object(objectId, triangleMesh, metadata)
 
@@ -143,16 +167,54 @@ def parseVertices(vertexNodes):
 
     vertices = []
 
-    for vertex in vertexNodes:
-        coordinates = vertex.find('coordinates')
+    for vertexNode in vertexNodes:
 
-        x = float(coordinates.find('x').text)
-        y = float(coordinates.find('y').text)
-        z = float(coordinates.find('z').text)
+        coordinatesNode = vertexNode.find('coordinates')
+        x = float(coordinatesNode.find('x').text)
+        y = float(coordinatesNode.find('y').text)
+        z = float(coordinatesNode.find('z').text)
+        coordinates = Vector3(x, y, z)
 
-        vertices.append(Vector3(x, y, z))
+        normalNode = vertexNode.find('normal')
+        if normalNode is not None:
+            nx = float(normalNode.find('nx').text)
+            ny = float(normalNode.find('ny').text)
+            nz = float(normalNode.find('nz').text)
+            normal = Vector3(nx, ny, nz)
+
+            # Normalize normal vector.
+            mag2 = normal.magnitudeSquared()
+            if mag2 - 1 > 0.0001 or mag2 - 1 < 0.0001:
+                if mag2 != float(0):
+                    normal /= sqrt(mag2)
+                else:
+                    normal = None
+        else:
+            normal = None
+
+        vertices.append(Vertex(coordinates, normal))
 
     return vertices
+
+
+def parseEdges(edgeNodes, vertices):
+
+    edges = []
+
+    for edgeNode in edgeNodes:
+        v1Index = int(edgeNode.find('v1').text)
+        dx1 = float(edgeNode.find('dx1').text)
+        dy1 = float(edgeNode.find('dy1').text)
+        dz1 = float(edgeNode.find('dz1').text)
+        t1 = Vector3(dx1, dy1, dz1)
+
+        v2Index = int(edgeNode.find('v2').text)
+        dx2 = float(edgeNode.find('dx2').text)
+        dy2 = float(edgeNode.find('dy2').text)
+        dz2 = float(edgeNode.find('dz2').text)
+        t2 = Vector3(dx2, dy2, dz2)
+
+        storeEdge(Edge(v1Index, t1, v2Index, t2), vertices)
 
 
 def parseVolumes(volumeNodes):
@@ -163,6 +225,270 @@ def parseVolumes(volumeNodes):
         volumes.append(Volume(volumeNode))
 
     return volumes
+
+
+def storeEdge(edge, vertices, scale=True):
+    '''Stores edge into vertices'''
+
+    if scale:
+        # Scale tangents to the length of edge.
+        edgeLength = (vertices[edge.v1Index].coordinates - vertices[edge.v0Index].coordinates).magnitude()
+        if edge.t0 is not None:
+            edge.t0 = edge.t0.getNormalized() * edgeLength
+        if edge.t1 is not None:
+            edge.t1 = edge.t1.getNormalized() * edgeLength
+
+    # edge.v0Index is by convention vertex with lower index than edge.v1Index so
+    # edge is always stored at vertex with lower index.
+
+    vertices[edge.v0Index].edges.append(edge)
+
+
+def getEdge(index1, index2, vertices):
+    '''Returns edge from point A to B'''
+
+    if index1 < index2:  # Edge is by convention stored at vertex with lower index.
+        storedAtIndex = index1
+        toIndex = index2
+    else:
+        storedAtIndex = index2
+        toIndex = index1
+
+    for edge in vertices[storedAtIndex].edges:
+        if edge.v1Index == toIndex:
+            return edge
+
+    return None
+
+
+def isCurvedTriange(triangle, vertices):
+    '''Returns true if "triangle" is curved triangle'''
+
+    for vertexIndex in triangle.vertexIndexes:
+        if vertices[vertexIndex].normal:
+            return True
+        for edge in vertices[vertexIndex].edges:
+            if edge.v0Index in triangle.vertexIndexes:
+                return True
+
+    return False
+
+
+def retesselate(triangle, vertices, recursive=True):
+
+    # build vertex list
+
+    triangleVertices = []
+    for vertexTIndex in range(3):
+        vertexAt = None
+        edge = getEdge(triangle.vertexIndexes[vertexTIndex], triangle.vertexIndexes[(vertexTIndex + 1) % 3], vertices)
+        if edge is not None:
+            vertexAt = edge.vertexAt
+        triangleVertices.append(triangle.vertexIndexes[vertexTIndex])
+        triangleVertices.append(vertexAt)
+
+    # Splits triangle in two along the line coming from first edge mid-point encounterd to opposite triangle vertex.
+    triangles = []
+    for middleVertexIndex in [1, 3, 5]:
+        middleVertex = triangleVertices[middleVertexIndex]
+        if middleVertex is None:
+            continue
+        oppositeVertex = triangleVertices[(middleVertexIndex + 3) % 6]
+        prevVertex = triangleVertices[(middleVertexIndex - 1) % 6]
+        nextVertex = triangleVertices[(middleVertexIndex + 1) % 6]
+        triangle = face.Face()
+        triangle.vertexIndexes.append(prevVertex)
+        triangle.vertexIndexes.append(middleVertex)
+        triangle.vertexIndexes.append(oppositeVertex)
+        triangles.append(triangle)
+        triangle = face.Face()
+        triangle.vertexIndexes.append(middleVertex)
+        triangle.vertexIndexes.append(nextVertex)
+        triangle.vertexIndexes.append(oppositeVertex)
+        triangles.append(triangle)
+
+    result = []
+    for t in triangles:
+        result += retesselate(t, vertices)
+
+    if len(result) == 0:
+        result.append(triangle)
+
+    return result
+
+
+def calcNormal(atVertexIndex, vertices, triangle):
+    '''Calculates normal to triangle surface at given vertex'''
+
+    thisVertexTIndex = triangle.vertexIndexes.index(atVertexIndex)
+    prevVertexTIndex = (thisVertexTIndex + 2) % 3
+    nextVertexTIndex = (thisVertexTIndex + 1) % 3
+
+    prevVertexIndex = triangle.vertexIndexes[prevVertexTIndex]
+    nextVertexIndex = triangle.vertexIndexes[nextVertexTIndex]
+
+    prevVertex = vertices[prevVertexIndex].coordinates
+    thisVertex = vertices[atVertexIndex].coordinates
+    nextVertex = vertices[nextVertexIndex].coordinates
+
+    edgeThisPrev = getEdge(atVertexIndex, prevVertexIndex, vertices)
+    tangentPrev = None
+    if edgeThisPrev is not None:
+        tangentPrev = edgeThisPrev.getTangent(atVertexIndex)
+        if prevVertexIndex > atVertexIndex and tangentPrev is not None:
+            tangentPrev = -tangentPrev
+    if tangentPrev is None:
+        tangentPrev = thisVertex - prevVertex
+
+    edgeThisNext = getEdge(atVertexIndex, nextVertexIndex, vertices)
+    tangentNext = None
+    if edgeThisNext is not None:
+        tangentNext = edgeThisNext.getTangent(atVertexIndex)
+        if atVertexIndex > nextVertexIndex and tangentNext is not None:
+            tangentNext = -tangentNext
+    if tangentNext is None:
+        tangentNext = nextVertex - thisVertex
+
+    normal = tangentPrev.cross(tangentNext)
+
+    return normal.getNormalized()
+
+
+def calcTangent(indexA, normalA, indexB, vertices):
+    '''Calculates tangent at vertexA to the edge connecting vertexA with vertexB'''
+
+    if indexA < indexB:
+        vectorAB = vertices[indexB].coordinates - vertices[indexA].coordinates
+    else:
+        vectorAB = vertices[indexA].coordinates - vertices[indexB].coordinates
+
+    tangentABRaw = (normalA.cross(vectorAB)).cross(normalA)
+
+    tangentAB = vectorAB.magnitude() * tangentABRaw.getNormalized()
+
+    return tangentAB
+
+
+def divideTriangle(triangle, vertices, depth):
+    '''Recursively divides curved triangle into subtriangles'''
+
+    # See Annex 3 - Formulae for interpolating a curved triangular patch, of ASTM F2915 standard.
+    # V0.48 draft is available at http://amf.wikispaces.com/file/detail/AMF_V0.48.pdf
+
+    if depth <= 0:
+        return [triangle]
+    depth -= 1
+
+    newVertexIndexes = []
+
+    for vertexTIndex in range(3):
+
+        AIndex = triangle.vertexIndexes[vertexTIndex]
+        BIndex = triangle.vertexIndexes[(vertexTIndex + 1) % 3]
+
+        edge = getEdge(AIndex, BIndex, vertices)
+        if edge is None:
+            edge = Edge(AIndex, None, BIndex, None)
+            storeEdge(edge, vertices)
+
+        v0Index = edge.v0Index
+        v1Index = edge.v1Index
+
+        v0 = vertices[v0Index].coordinates
+        v1 = vertices[v1Index].coordinates
+        n0 = vertices[v0Index].normal
+        n1 = vertices[v1Index].normal
+
+        if n0 is None:
+            n0 = calcNormal(v0Index, vertices, triangle)
+
+        if n1 is None:
+            n1 = calcNormal(v1Index, vertices, triangle)
+
+        if edge.vertexAt is None:
+            # This edge was not split yet.
+
+            t0 = edge.t0
+            if t0 is None:
+                t0 = calcTangent(v0Index, n0, v1Index, vertices)
+                edge.t0 = t0
+
+            t1 = edge.t1
+            if t1 is None:
+                t1 = calcTangent(v1Index, n1, v0Index, vertices)
+                edge.t1 = t1
+
+            # v01 = h(s) for s = 0.5
+            # h(s) = (2s^3-3s^2+1)v0 + (s^3-2s^2+s)t0 + (-2s^3+3s^2)v1 + (s^3-s^2)t1
+            # h(0.5) = (0.5)v0 + (0.125)t0 + (0.5)v1 + (-0.125)t1
+
+            v01 = (0.5) * v0 + (0.125) * t0 + (0.5) * v1 + (-0.125) * t1
+
+            # t01 = t(s) for s = 0.5
+            # t(s) = (6s^2-6s)v0 + (3s^2-4s+1)t0 + (-6s^2+6s)v1 + (3s^2-2s)t1
+            # t(0.5) = (-1.5)v0 + (-0.25)t0 + (1.5)v1 + (-0.25)t1
+
+            t01 = (-1.5) * v0 + (-0.25) * t0 + (1.5) * v1 + (-0.25) * t1
+
+            n01 = None
+
+            vertex01Index = len(vertices)
+            vertex01 = Vertex(v01)
+            vertices.append(vertex01)
+
+            storeEdge(Edge(v0Index, t0, vertex01Index, t01), vertices)
+            storeEdge(Edge(v1Index, -t1, vertex01Index, -t01), vertices)
+            edge.vertexAt = vertex01Index
+
+        else:
+            # This edge was already split when neighbouring triangle was processed. Existing data may be
+            # reused.
+
+            v01 = vertices[edge.vertexAt].coordinates
+            t01 = getEdge(v0Index, edge.vertexAt, vertices).getTangent(edge.vertexAt)
+            n01 = vertices[edge.vertexAt].normal
+            vertex01Index = edge.vertexAt
+            vertex01 = vertices[vertex01Index]
+
+        if n01 is None:
+            # The normal at the subdivided center point shall be linearly interpolated from the two endpoint normals then
+            # forced to the nearest perpendicular direction from the calculated center point edge tangent.
+            # - Jonathan Hiller, https://groups.google.com/forum/?fromgroups=#!topic/stl2/uIIiRVorbMU
+
+            n01 = 0.5 * (n0 + n1)
+            n01 = t01.cross(n01.cross(t01))
+            vertex01.normal = n01.getNormalized()
+
+        newVertexIndexes.append(vertex01Index)
+
+    newTriangles = []
+
+    # create 3x "vertex" triangles
+    for vertexTIndex in range(3):
+        v1 = triangle.vertexIndexes[vertexTIndex]
+        v2 = newVertexIndexes[vertexTIndex]
+        v3 = newVertexIndexes[(vertexTIndex + 2) % 3]
+        triangleFace = face.Face()
+        triangleFace.vertexIndexes = [v1, v2, v3]
+        newTriangles.append(triangleFace)
+
+    # create "center" triangle
+    v1 = newVertexIndexes[0]
+    v2 = newVertexIndexes[1]
+    v3 = newVertexIndexes[2]
+    triangleFace = face.Face()
+    triangleFace.vertexIndexes = [v1, v2, v3]
+    newTriangles.append(triangleFace)
+
+    result = []
+
+    for newTriangle in newTriangles:
+        result += divideTriangle(newTriangle, vertices, depth)
+
+    for vertexIndex in newVertexIndexes:
+        vertices[vertexIndex].normal = None
+
+    return result
 
 
 class Volume:
@@ -182,6 +508,42 @@ class Volume:
             triangleFace.vertexIndexes = [v1, v2, v3]
             triangleFace.volumeRef = self
             self.triangleFaces.append(triangleFace)
+
+
+class Edge:
+
+    def __init__(self, v0Index, t0, v1Index, t1, vertexAt=None):
+
+        if v0Index < v1Index:
+            self.v0Index = v0Index
+            self.t0 = t0
+            self.v1Index = v1Index
+            self.t1 = t1
+        else:
+            self.v0Index = v1Index
+            self.t0 = t1
+            self.v1Index = v0Index
+            self.t1 = t0
+
+        self.vertexAt = vertexAt  # Holds index of vertex, calc. by interpolation, laying on this edge.
+
+    def getTangent(self, atIndex):
+
+        if atIndex == self.v0Index:
+            return self.t0
+        elif atIndex == self.v1Index:
+            return self.t1
+        else:
+            return None
+
+
+class Vertex:
+
+    def __init__(self, coordinates, normal=None):
+
+        self.coordinates = coordinates
+        self.normal = normal
+        self.edges = []
 
 
 class MetaData:

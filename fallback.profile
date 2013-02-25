@@ -10,6 +10,7 @@ replace.filename=replace.csv
 export.slicedfile=true
 export.slicedfile.extension=slicedfile.pickle
 overwrite.exported.slicedfile=true
+amf.curved.triangles.subdivision.depth=4
 
 
 [preface]
