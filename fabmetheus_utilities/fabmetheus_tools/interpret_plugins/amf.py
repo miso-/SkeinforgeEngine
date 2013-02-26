@@ -11,6 +11,14 @@ from config import config
 
 __license__ = 'GNU Affero General Public License http://www.gnu.org/licenses/agpl.html'
 
+unitsConversionDict = {'milimeter': 1,
+                       'meter': 1000,
+                       'micron': 0.001,
+                       'inch': 25.4,
+                       'feet': 304.8}
+
+unitScaleFactor = 1
+
 
 def getCarving(slicedFile):
     "Get the triangle mesh for the stl file."
@@ -43,6 +51,10 @@ def parseFile(slicedFile):
         return
 
     fileNode = ET.parse(slicedFile.fileName).getroot()
+
+    unit = fileNode.get('unit')
+    global unitScaleFactor
+    unitScaleFactor = unitsConversionDict.get(unit, 1)
 
     objectIds = {}
     objects = []
@@ -108,7 +120,7 @@ def parsePlacement(instanceNode):
     ry = parsePlacementElement(instanceNode, 'ry')
     rz = parsePlacementElement(instanceNode, 'rz')
 
-    displacement = Vector3(x, y, z)
+    displacement = Vector3(x, y, z) * unitScaleFactor
     rotation = Vector3(rx, ry, rz)
 
     return Placement(displacement, rotation)
@@ -173,7 +185,7 @@ def parseVertices(vertexNodes):
         x = float(coordinatesNode.find('x').text)
         y = float(coordinatesNode.find('y').text)
         z = float(coordinatesNode.find('z').text)
-        coordinates = Vector3(x, y, z)
+        coordinates = Vector3(x, y, z) * unitScaleFactor
 
         normalNode = vertexNode.find('normal')
         if normalNode is not None:
@@ -206,13 +218,13 @@ def parseEdges(edgeNodes, vertices):
         dx1 = float(edgeNode.find('dx1').text)
         dy1 = float(edgeNode.find('dy1').text)
         dz1 = float(edgeNode.find('dz1').text)
-        t1 = Vector3(dx1, dy1, dz1)
+        t1 = Vector3(dx1, dy1, dz1) * unitScaleFactor
 
         v2Index = int(edgeNode.find('v2').text)
         dx2 = float(edgeNode.find('dx2').text)
         dy2 = float(edgeNode.find('dy2').text)
         dz2 = float(edgeNode.find('dz2').text)
-        t2 = Vector3(dx2, dy2, dz2)
+        t2 = Vector3(dx2, dy2, dz2) * unitScaleFactor
 
         storeEdge(Edge(v1Index, t1, v2Index, t2), vertices)
 
