@@ -2,7 +2,7 @@ from fabmetheus_utilities.geometry.geometry_tools import face
 from fabmetheus_utilities.geometry.solids import triangle_mesh
 from fabmetheus_utilities.vector3 import Vector3
 from fabmetheus_utilities import archive
-from entities import File, Object, Constellation, Instance, Placement
+from entities import File, Volume, Object, Constellation, Instance, Placement
 from struct import unpack
 import xml.etree.ElementTree as ET
 from math import sqrt
@@ -139,17 +139,18 @@ def parsePlacementElement(instanceNode, elementName):
 def parseObject(objectNode):
 
     objectId = int(objectNode.get('id'))
-    metadata = MetaData(objectNode.findall('metadata'))
-    triangleMesh = triangle_mesh.TriangleMesh()
-
     vertices = parseVertices(objectNode.findall('mesh/vertices/vertex'))
-    parseEdges(objectNode.findall('mesh/vertices/edge'), vertices)
     volumes = parseVolumes(objectNode.findall('mesh/volume'))
+    color = None
+    metadata = MetaData(objectNode.findall('metadata'))
+
+    parseEdges(objectNode.findall('mesh/vertices/edge'), vertices)
 
     for volume in volumes:
         curvedTriangles = []
         plainTriangles = []
-        for triangleFace in volume.triangleFaces:
+        triangleMesh = triangle_mesh.TriangleMesh()
+        for triangleFace in volume.triangleMesh.faces:
             if isCurvedTriange(triangleFace, vertices):
                 curvedTriangles.append(triangleFace)
             else:
@@ -170,9 +171,36 @@ def parseObject(objectNode):
                 triangleFace.index = len(triangleMesh.faces)
                 triangleMesh.faces.append(triangleFace)
 
-    triangleMesh.vertexes = [vertex.coordinates for vertex in vertices]
+        volume.triangleMesh = triangleMesh
 
-    return Object(objectId, triangleMesh, metadata)
+    meshVertices = [vertex.coordinates for vertex in vertices]
+
+    return Object(objectId, meshVertices, volumes, color, metadata)
+
+
+def parseVolumes(volumeNodes):
+
+    volumes = []
+
+    for volumeNode in volumeNodes:
+
+        triangleFaces = []
+        color = None
+        materialId = volumeNode.get('materialId')
+        metadata = MetaData(volumeNode.findall('metadata'))
+
+        for triangle in volumeNode.findall('triangle'):
+            v1 = int(triangle.find('v1').text)
+            v2 = int(triangle.find('v2').text)
+            v3 = int(triangle.find('v3').text)
+
+            triangleFace = face.Face()
+            triangleFace.vertexIndexes = [v1, v2, v3]
+            triangleFaces.append(triangleFace)
+
+        volumes.append(Volume(triangleFaces, color, materialId, metadata))
+
+    return volumes
 
 
 def parseVertices(vertexNodes):
@@ -227,16 +255,6 @@ def parseEdges(edgeNodes, vertices):
         t2 = Vector3(dx2, dy2, dz2) * unitScaleFactor
 
         storeEdge(Edge(v1Index, t1, v2Index, t2), vertices)
-
-
-def parseVolumes(volumeNodes):
-
-    volumes = []
-
-    for volumeNode in volumeNodes:
-        volumes.append(Volume(volumeNode))
-
-    return volumes
 
 
 def storeEdge(edge, vertices, scale=True):
@@ -501,25 +519,6 @@ def divideTriangle(triangle, vertices, depth):
         vertices[vertexIndex].normal = None
 
     return result
-
-
-class Volume:
-
-    def __init__(self, volumeNode):
-
-        self.triangleFaces = []
-        self.materialId = volumeNode.get('materialid')
-        self.metadata = MetaData(volumeNode.findall('metadata'))
-
-        for triangle in volumeNode.findall('triangle'):
-            v1 = int(triangle.find('v1').text)
-            v2 = int(triangle.find('v2').text)
-            v3 = int(triangle.find('v3').text)
-
-            triangleFace = face.Face()
-            triangleFace.vertexIndexes = [v1, v2, v3]
-            triangleFace.volumeRef = self
-            self.triangleFaces.append(triangleFace)
 
 
 class Edge:

@@ -4,6 +4,7 @@ from .Layer import Layer
 from .paths import BoundaryPerimeter, Loop, InfillPath, TravelPath, SupportPath
 from .RuntimeParameters import RuntimeParameters
 from .File import File
+from .Volume import Volume
 from .Object import Object
 from .Constellation import Constellation
 from .Instance import Instance

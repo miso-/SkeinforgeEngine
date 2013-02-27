@@ -18,7 +18,7 @@ from fabmetheus_utilities.geometry.geometry_tools import face
 from fabmetheus_utilities.geometry.solids import triangle_mesh
 from fabmetheus_utilities.vector3 import Vector3
 from fabmetheus_utilities import archive
-from entities import Object, Constellation, Instance
+from entities import Volume, Object, Constellation, Instance
 from struct import unpack
 
 __author__ = 'Enrique Perez (perez_enrique@yahoo.com)'
@@ -81,7 +81,8 @@ def getCarving(slicedFile):
     # A binary stl should never start with the word "solid".  Because this error is common the file is been parsed as binary regardless.
         addFacesGivenBinary( stlData, triangleMesh, vertexIndexTable )
 
-    obj = Object(0, triangleMesh)
+    volume = Volume(triangleMesh.faces)
+    obj = Object(0, triangleMesh.vertexes, [volume])
     slicedFile.addObjects([obj])
     slicedFile.printbed.addInstances([Instance(obj)])
 

@@ -53,9 +53,9 @@ class LineFillStrategy:
         self.previousExtraShells = -1
         self.oldOrderedLocation = None
 
-    def fill(self, layer, object):
+    def fill(self, layer, volume):
         'Add fill to the carve layer.'
-        self.object = object
+        self.volume = volume
         layerIndex = layer.index
         alreadyFilledArounds = []
         pixelTable = {}
@@ -175,10 +175,10 @@ class LineFillStrategy:
     def addRotatedCarve(self, currentLayer, layerDelta, reverseRotation, surroundingCarves):
         'Add a rotated carve to the surrounding carves.'
         layerIndex = currentLayer + layerDelta
-        if layerIndex < 0 or layerIndex >= len(self.object.layers):
+        if layerIndex < 0 or layerIndex >= len(self.volume.layers):
             return
 
-        layer = self.object.layers[layerIndex]
+        layer = self.volume.layers[layerIndex]
 
         nestedRings = layer.nestedRings
         rotatedCarve = []

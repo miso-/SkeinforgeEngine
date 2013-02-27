@@ -62,6 +62,7 @@ class FillSkein:
             logger.warning("Exception reading strategy %s: %s", self.fillStrategyName, inst)
 
         for object in self.slicedFile.getObjectListToSlice():
-            for layer in object.layers:
-                if fillStrategy is not None:
-                    fillStrategy.fill(layer, object)
+            for volume in object.volumes:
+                for layer in volume.layers:
+                    if fillStrategy is not None:
+                        fillStrategy.fill(layer, volume)

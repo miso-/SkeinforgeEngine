@@ -39,9 +39,10 @@ def performAction(slicedFile):
 
     if config.getboolean(name, 'debug'):
         for object in slicedFile.getObjectListToSlice():
-            carvingFilename = slicedFile.fileName[: slicedFile.fileName.rfind('.')] + '_' + str(object.objectId) + '.carving.xml'
-            archive.writeFileText(carvingFilename, str(object.triangleMesh))
-            logger.info("Carving XML written to %s", carvingFilename)
+            for (vIndex, volume) in enumerate(object.volumes):
+                carvingFilename = slicedFile.fileName[: slicedFile.fileName.rfind('.')] + '_obj' + str(object.objectId) + '-vol' + str(vIndex) + '.carving.xml'
+                archive.writeFileText(carvingFilename, str(volume.triangleMesh))
+                logger.info("Carving XML written to %s", carvingFilename)
     CarveSkein(slicedFile).carve()
 
 
@@ -91,12 +92,13 @@ class CarveSkein:
     def carve(self):
 
         for object in self.slicedFile.getObjectListToSlice():
-            self.carveObject(object)
+            for volume in object.volumes:
+                self.carveVolume(volume)
 
-    def carveObject(self, object):
+    def carveVolume(self, volume):
         "Parse 3D model file and store the carved slicedFile."
 
-        carving = object.triangleMesh
+        carving = volume.triangleMesh
         carving.setCarveInfillInDirectionOfBridge(self.infillBridgeDirection)
         carving.setCarveLayerThickness(self.layerHeight)
         importRadius = 0.5 * self.importCoarsenessRatio * abs(self.extrusionWidth)
@@ -109,8 +111,8 @@ class CarveSkein:
             logger.warning('There are no slices for the model, this could be because the model is too small for the Layer Thickness.')
             return
 
-        object.carvingCornerMaximum = carving.getCarveCornerMaximum()
-        object.carvingCornerMinimum = carving.getCarveCornerMinimum()
+        volume.carvingCornerMaximum = carving.getCarveCornerMaximum()
+        volume.carvingCornerMinimum = carving.getCarveCornerMinimum()
 
         toBePrintedLayers = rotatedLoopLayers[self.layerPrintFrom: self.layerPrintTo]
         for toBePrintedLayer in toBePrintedLayers:
@@ -121,18 +123,18 @@ class CarveSkein:
                 sortedLoops.append(toBePrintedLayerLoop[lowerLeftIndex:] + toBePrintedLayerLoop[:lowerLeftIndex])
             toBePrintedLayer.loops = sortedLoops
 
-        object.rotatedLoopLayers = toBePrintedLayers
+        volume.rotatedLoopLayers = toBePrintedLayers
 
         if config.getboolean(name, 'debug'):
             filename = self.slicedFile.fileName
-            svgFilename = filename[: filename.rfind('.')] + '_' + str(object.objectId) + '.svg'
+            svgFilename = filename[: filename.rfind('.')] + '_obj' + str(volume.parentObject.objectId) + '-vol' + str(volume.parentObject.volumes.index(volume)) + '.svg'
             svgWriter = svg_writer.SVGWriter(True,
-                                             object.carvingCornerMaximum,
-                                             object.carvingCornerMinimum,
+                                             volume.carvingCornerMaximum,
+                                             volume.carvingCornerMinimum,
                                              self.slicedFile.runtimeParameters.decimalPlaces,
                                              self.slicedFile.runtimeParameters.layerHeight,
                                              self.slicedFile.runtimeParameters.layerThickness)
-            archive.writeFileText(svgFilename, svgWriter.getReplacedSVGTemplate(filename + str(object.objectId), '', object.rotatedLoopLayers))
+            archive.writeFileText(svgFilename, svgWriter.getReplacedSVGTemplate(svgFilename[: svgFilename.rfind('.')], '', volume.rotatedLoopLayers))
             logger.info("Carving SVG written to %s", svgFilename)
 
     def getLowerLeftCorner(self, points):

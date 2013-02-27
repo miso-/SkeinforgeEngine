@@ -29,7 +29,7 @@ def performAction(slicedFile):
     # HACK these options are in "speed" section so they should be set no matter if bottom plugin is active
     firstLayerFeedRateRatio = config.getfloat('speed', 'feed.rate.first.layer.ratio')
     firstLayerFlowRateRatio = config.getfloat('speed', 'flow.rate.first.layer.ratio')
-    for (layer, instance) in slicedFile.printbed.getLayersGroupedByZ()[0]:
+    for (layer, volume, instance) in slicedFile.printbed.getLayersGroupedByZ()[0]:
         layer.feedAndFlowRateMultiplier = [firstLayerFeedRateRatio, firstLayerFlowRateRatio]
 
     if not config.getboolean(name, 'active'):
@@ -54,7 +54,7 @@ class BottomSkein:
 
         zBottoms = []
         for instance in self.slicedFile.printbed.instances:
-            zBottoms.append(instance.object.layers[0].z + instance.placement.displacement.z)
+            zBottoms.append(instance.object.layersGroupedByZ[0][0][0].z + instance.placement.displacement.z)
 
         zBottom = min(zBottoms)
         deltaZ = self.altitude + self.additionalHeightRatio * self.layerHeight - zBottom

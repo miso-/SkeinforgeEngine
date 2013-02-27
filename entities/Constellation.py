@@ -90,20 +90,25 @@ class Constellation:
         layerIndexes = [0] * len(instances)
         self.layersGroupedByZ = []
 
+        for (instanceIndex, layerIndex) in enumerate(layerIndexes):
+            if len(instances[instanceIndex].object.getLayersGroupedByZ()) == 0:
+                layerIndexes[instanceIndex] = None
+
         while len([layerIndex for layerIndex in layerIndexes if layerIndex is not None]) > 0:
 
-            nextZ = min([instances[instanceIndex].object.layers[layerIndex].z for instanceIndex, layerIndex in enumerate(layerIndexes) if layerIndex is not None])
+            nextZ = min([instances[instanceIndex].object.getLayersGroupedByZ()[layerIndex][0][0].z for instanceIndex, layerIndex in enumerate(layerIndexes) if layerIndex is not None])
 
             layerGroup = []
             for instanceIndex, layerIndex in enumerate(layerIndexes):
                 if layerIndex is None:
                     continue
                 instance = instances[instanceIndex]
-                z = instances[instanceIndex].object.layers[layerIndex].z
+                z = instances[instanceIndex].object.getLayersGroupedByZ()[layerIndex][0][0].z
 
                 if z == nextZ:
-                    layerGroup.append((instance.object.layers[layerIndex], instance))
-                    if len(instance.object.layers) > layerIndex + 1:
+                    for (layer, volume) in instances[instanceIndex].object.getLayersGroupedByZ()[layerIndex]:
+                        layerGroup.append((layer, volume, instance))
+                    if len(instance.object.getLayersGroupedByZ()) > layerIndex + 1:
                         layerIndexes[instanceIndex] += 1
                     else:
                         layerIndexes[instanceIndex] = None

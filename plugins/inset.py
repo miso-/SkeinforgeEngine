@@ -59,14 +59,15 @@ class InsetSkein:
     def inset(self):
 
         for object in self.slicedFile.getObjectListToSlice():
-            self.insetObject(object)
+            for volume in object.volumes:
+                self.insetVolume(volume)
 
-    def insetObject(self, object):
+    def insetVolume(self, volume):
         "Inset the layers"
 
         if self.multiprocess:
             manager = Manager()
-            sharedLayers = manager.list(object.layers)
+            sharedLayers = manager.list(volume.layers)
 
             p = Pool()
             resultLayers = p.map(self.addInsetForLayer, sharedLayers)
@@ -74,11 +75,11 @@ class InsetSkein:
             p.join()
 
             for resultLayer in resultLayers:
-                object.layers[resultLayer.index] = resultLayer
+                volume.layers[resultLayer.index] = resultLayer
 
         else:
 
-            for layer in object.layers:
+            for layer in volume.layers:
                 self.addInsetForLayer(layer)
 
     def addInsetForLayer(self, layer):

@@ -38,7 +38,7 @@ class GcodeWriter:
             output.write(printCommand(preLayerGcodeCommand, verbose))
 
         pathList = []
-        for (layer, instance) in layerGroup:
+        for (layer, volume, instance) in layerGroup:
             pathList += layer.getOrderedPathList()
 
         paths.resetExtrusionStats()

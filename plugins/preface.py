@@ -52,10 +52,11 @@ class PrefaceSkein:
 
     def prefaceObject(self, object):
 
-        for (index, rotatedLoopLayer) in enumerate(object.rotatedLoopLayers):
-            self.addPrefaceToGcode(index, rotatedLoopLayer, object)
+        for volume in object.volumes:
+            for (index, rotatedLoopLayer) in enumerate(volume.rotatedLoopLayers):
+                self.addPrefaceToGcode(index, rotatedLoopLayer, volume)
 
-    def addPrefaceToGcode(self, index, rotatedLoopLayer, object):
+    def addPrefaceToGcode(self, index, rotatedLoopLayer, volume):
         decimalPlaces = self.slicedFile.runtimeParameters.decimalPlaces
 
         # adding 0.5*layerHeight is needed to get layer[0].z == layerHeight
@@ -85,7 +86,7 @@ class PrefaceSkein:
                 parentNestedRing = nestRingPlaceholder[str(internalLoops[internalLoop])]
                 parentNestedRing.innerNestedRings.append(childNestedRing)
 
-        object.layers.append(layer)
+        volume.layers.append(layer)
 
     def createLoopHierarchy(self, loops):
         internalLoops = {}
